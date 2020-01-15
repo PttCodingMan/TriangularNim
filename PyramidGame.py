@@ -278,6 +278,9 @@ class Pyramid(object):
             self.setLine(LastLine)
             self.show()
 
+        if len(self.__LegalMove) == 1:
+            return None
+
         if len(self.__LegalMove) == 63:
             # 先手的話就下必勝路徑的第一手
             # 九種開場隨便挑，都 100 %
@@ -409,9 +412,23 @@ if __name__ == '__main__':
             C = input('你要先下嗎? [Y/n] ')
             if C == '' or C.lower() == 'y':
                 print('選擇先下')
+
+                MinAcceptableProbability = 0
+                while True:
+                    try:
+                        MinAcceptableProbability = input(
+                            '請輸入電腦可接受獲勝機率 (0~100): ')
+                        MinAcceptableProbability = int(
+                            MinAcceptableProbability)
+                        if 0 <= MinAcceptableProbability <= 100:
+                            break
+                        print('參數有誤，請重新輸入')
+                    except Exception:
+                        MinAcceptableProbability = 0
+
                 PlayerFirst = True
                 InputLine = pyramid.getInputLine()
-                # InputLine.show()
+
                 break
             elif C == 'n'.lower():
                 print('選擇後下')
@@ -422,10 +439,10 @@ if __name__ == '__main__':
         while not pyramid.isFinish():
             ComputerMove = pyramid.nextMove(
                 LastLine=InputLine, PlayerFirst=PlayerFirst)
-            pyramid.show()
             if ComputerMove is None:
                 print('電腦認輸')
                 break
+            pyramid.show()
             print('電腦選擇 ', end='')
             for P in ComputerMove.getLine():
                 Pstr = str(PointList.index(P))
