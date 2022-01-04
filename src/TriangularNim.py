@@ -4,8 +4,8 @@ from copy import deepcopy
 
 from SingleLog.log import Logger
 
-Version = '0.2.0'
-MinAcceptableProbability = 96
+version = '0.2.0'
+min_acceptable_probability = 96
 
 
 class Point(object):
@@ -325,7 +325,7 @@ class Pyramid(object):
                     max_rate = rate
                     max_rate_move = PossibleLine
                 # 判斷可接受勝率，所有可能跑完其實蠻慢的 QQ
-                if (rate * 100) >= MinAcceptableProbability and not recursive_result:
+                if (rate * 100) >= min_acceptable_probability and not recursive_result:
                     print('發現可接受獲勝機率為 ' + str(int(rate * 100)) + ' %')
                     self.set_line(PossibleLine)
                     return PossibleLine
@@ -380,7 +380,7 @@ class Pyramid(object):
 
 if __name__ == '__main__':
     logger = Logger('Nim')
-    logger.info('Welcome to TriangularNim version', Version)
+    logger.info('Welcome to TriangularNim version', version)
 
     win_count = 0
     lose_count = 0
@@ -401,18 +401,18 @@ if __name__ == '__main__':
             if c == '' or c.lower() == 'y':
                 logger.info('選擇先下')
 
-                MinAcceptableProbability = 0
-                while True:
-                    try:
-                        MinAcceptableProbability = input(
-                            '請輸入電腦可接受獲勝機率 (0~100): ')
-                        MinAcceptableProbability = int(
-                            MinAcceptableProbability)
-                        if 0 <= MinAcceptableProbability <= 100:
-                            break
-                        logger.info('參數有誤，請重新輸入')
-                    except Exception:
-                        MinAcceptableProbability = 0
+                # min_acceptable_probability = 0
+                # while True:
+                #     try:
+                #         min_acceptable_probability = input(
+                #             '請輸入電腦可接受獲勝機率 (0~100): ')
+                #         min_acceptable_probability = int(
+                #             min_acceptable_probability)
+                #         if 0 <= min_acceptable_probability <= 100:
+                #             break
+                #         logger.info('參數有誤，請重新輸入')
+                #     except Exception:
+                #         min_acceptable_probability = 0
 
                 player_first = True
                 input_line = pyramid.get_input_line()
