@@ -175,7 +175,7 @@ class Pyramid(object):
                 N += 1
             print('')
 
-    def setLine(self, line):
+    def set_line(self, line):
         if line not in self.legal_move:
             print('[Error] Not in Legal move')
             return
@@ -224,7 +224,7 @@ class Pyramid(object):
         for possible_line in self.legal_move:
 
             map_temp = deepcopy(self)
-            map_temp.setLine(possible_line)
+            map_temp.set_line(possible_line)
 
             result = map_temp.next_move_recursive(
                 self.player_mode_mask - mode, level=(level + 1))
@@ -264,7 +264,7 @@ class Pyramid(object):
         global PointList
 
         if last_line is not None:
-            self.setLine(last_line)
+            self.set_line(last_line)
             self.show()
 
         if len(self.legal_move) == 1:
@@ -289,7 +289,7 @@ class Pyramid(object):
             line_temp = first_line_list[first_line_index]
             # 就是這麼霸氣，直接給出勝率 100 % 的答案
             print(line_temp.toString() + '獲勝機率為 100 %')
-            self.setLine(line_temp)
+            self.set_line(line_temp)
             return line_temp
 
         if player_first:
@@ -304,7 +304,7 @@ class Pyramid(object):
 
             pyramid_temp = deepcopy(self)
 
-            pyramid_temp.setLine(PossibleLine)
+            pyramid_temp.set_line(PossibleLine)
             print(PossibleLine.toString(), end='')
 
             recursive_result = pyramid_temp.next_move_recursive(
@@ -327,13 +327,13 @@ class Pyramid(object):
                 # 判斷可接受勝率，所有可能跑完其實蠻慢的 QQ
                 if (rate * 100) >= MinAcceptableProbability and not recursive_result:
                     print('發現可接受獲勝機率為 ' + str(int(rate * 100)) + ' %')
-                    self.setLine(PossibleLine)
+                    self.set_line(PossibleLine)
                     return PossibleLine
 
             print('獲勝機率為 ' + str(int(rate * 100)) + ' %')
 
             if recursive_result:
-                self.setLine(PossibleLine)
+                self.set_line(PossibleLine)
                 return PossibleLine
             else:
                 pass
@@ -342,12 +342,12 @@ class Pyramid(object):
             if max_rate_move is None:
                 self.computer_lose = True
             else:
-                self.setLine(max_rate_move)
+                self.set_line(max_rate_move)
             return max_rate_move
 
         return None
 
-    def getInputLine(self):
+    def get_input_line(self):
         while True:
             line_str = input('請按照右邊的編號輸入你想要畫的線 1 ~ 3 個: ')
             number_list = re.findall(r'\d+', line_str)
@@ -415,7 +415,7 @@ if __name__ == '__main__':
                         MinAcceptableProbability = 0
 
                 player_first = True
-                input_line = pyramid.getInputLine()
+                input_line = pyramid.get_input_line()
 
                 break
             elif c.lower() == 'n':
@@ -442,7 +442,7 @@ if __name__ == '__main__':
             if pyramid.is_finish():
                 logger.info('電腦獲勝')
                 break
-            input_line = pyramid.getInputLine()
+            input_line = pyramid.get_input_line()
     except KeyboardInterrupt:
         logger.info('使用者中斷')
 
