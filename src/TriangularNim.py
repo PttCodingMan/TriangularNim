@@ -1,13 +1,13 @@
 import random
 import re
-import sys
 from argparse import ArgumentParser
 from copy import deepcopy
 
 from SingleLog.log import Logger
 
+from cache import cache
+
 version = '0.2.0'
-min_acceptable_probability = 95
 
 
 def copy_func(o):
@@ -15,7 +15,7 @@ def copy_func(o):
 
 
 all_point_list = None
-count_map = {}
+count_map = cache
 
 
 class Point:
@@ -211,7 +211,7 @@ class TriangularNim(object):
             result += (1 * p if x else 0)
             p *= 2
 
-        return result
+        return f'{result}'
 
     def next_move_recursive(self, mode, level=-1):
 
@@ -222,18 +222,18 @@ class TriangularNim(object):
             # 只剩下最後一格的情況
             if mode == self.player_mode_me:
                 # 如果是我方，則輸 False
-                return False
+                return False, 0, 1
             else:
                 # 如果是對方，則贏 True
-                return True
+                return True, 1, 0
         elif len(self.legal_move) == 0:
             # 已經沒有圈圈可以畫了，表示上一輪就結束了
             if mode == self.player_mode_me:
                 # 如果是我方，則贏 True
-                return True
+                return True, 1, 0
             else:
                 # 如果是對方，則輸 False
-                return False
+                return False, 0, 1
 
         for possible_line in self.legal_move:
 
@@ -243,11 +243,12 @@ class TriangularNim(object):
             next_move_value = next_move_map.count_value()
 
             if next_move_value in count_map:
-                restore_mode, restore_result = count_map[next_move_value]
+                temp_list = count_map[next_move_value]
+                restore_mode, restore_result = temp_list[0], temp_list[1]
 
-                result = restore_result if mode == restore_mode else not restore_result
+                result = (restore_result if mode == restore_mode else not restore_result)
             else:
-                result = next_move_map.next_move_recursive(
+                result, _, _ = next_move_map.next_move_recursive(
                     self.player_mode_mask - mode, level=(level + 1))
 
             if level == 0:
@@ -258,21 +259,21 @@ class TriangularNim(object):
                     self.lose_count += 1
 
             if next_move_value not in count_map:
-                count_map[next_move_value] = (mode, result)
+                count_map[next_move_value] = [mode, result]
 
             if mode == self.player_mode_me and result:
                 # 如果是換我方下 目標是找到 True (我方獲勝)
-                return True
+                return True, self.win_count, self.lose_count
             elif mode == self.player_mode_other and not result:
                 # 如果是換對方下 目標是找到 False (我方失敗)
-                return False
+                return False, self.win_count, self.lose_count
 
         if mode == self.player_mode_me:
             # 如果我方都找不到獲勝的下一步，則回傳 False
-            return False
+            return False, self.win_count, self.lose_count
         elif mode == self.player_mode_other:
             # 如果對方都找不到讓我方失敗的下一步，則回傳 True (我方獲勝)
-            return True
+            return True, self.win_count, self.lose_count
 
     def is_finish(self):
         condition0 = len(self.legal_move) == 1 and len(
@@ -324,36 +325,31 @@ class TriangularNim(object):
             logger.info('開始分析獲勝機率')
         for possible_line in self.legal_move:
 
-            self.win_count = 0
-            self.lose_count = 0
-
             pyramid_temp = copy_func(self)
 
             pyramid_temp.set_line(possible_line)
             print(possible_line, end='')
 
-            recursive_result = pyramid_temp.next_move_recursive(
+            recursive_result, win_count, lose_count = pyramid_temp.next_move_recursive(
                 self.player_mode_other, level=0)
-            if (self.win_count + self.lose_count) == 0:
+
+            logger.debug('count', win_count, lose_count)
+            if (win_count + lose_count) == 0:
                 # 表示這一層的嘗試就分出勝負了
                 if recursive_result:
                     rate = 1
                 else:
                     rate = 0
             else:
-                rate = self.win_count / (self.win_count + self.lose_count)
+                rate = win_count / (win_count + lose_count)
 
             if player_first:
+
                 # 只有玩家先行才有可能，所有嘗試都沒有 100 % 勝率，
                 # 才需要紀錄最大勝率
                 if rate > max_rate:
                     max_rate = rate
                     max_rate_move = possible_line
-                # 判斷可接受勝率，所有可能跑完其實蠻慢的 QQ
-                if (rate * 100) >= min_acceptable_probability and not recursive_result:
-                    print(' 發現可接受獲勝機率為 ' + str(int(rate * 100)) + ' %')
-                    self.set_line(possible_line)
-                    return possible_line
 
             print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
 
@@ -419,6 +415,8 @@ if __name__ == '__main__':
     try:
         if args.demo:
             computer_move = nim.next_move()
+            # with open('src/cache.py', 'w') as f:
+            #     json.dump(count_map, f, indent=4)
         else:
             while True:
                 c = input('你要先下嗎? [Y/n] ')
