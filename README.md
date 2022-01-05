@@ -1,5 +1,5 @@
 # 三角棋 Triangular Nim
-<img src="/Logo.png" width="500">
+<img src="/demo.png" width="500">
 
 這是三角棋[[1]]  
 開始時共有 15 個圈圈，玩家可以畫一個直線，消掉一到三顆  
