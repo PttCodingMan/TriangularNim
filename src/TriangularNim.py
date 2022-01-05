@@ -1,11 +1,16 @@
 import random
 import re
+from argparse import ArgumentParser
 from copy import deepcopy
 
 from SingleLog.log import Logger
 
 version = '0.2.0'
-min_acceptable_probability = 96
+min_acceptable_probability = 95
+
+
+def copy_func(o):
+    return deepcopy(o)
 
 
 class Point(object):
@@ -14,12 +19,10 @@ class Point(object):
         self.x = x
 
     def show(self):
-        print(self.toString())
+        print(self)
 
-    def toString(self):
-        result = str(PointList.index(self))
-        if len(result) == 1:
-            result = '0' + result
+    def __str__(self):
+        result = f'{str(all_point_list.index(self)):02}'
         return result
 
     def __eq__(self, other):
@@ -38,13 +41,10 @@ class Line(object):
         self.line = sorted(point_list)
 
     def show(self):
-        print(self.toString())
+        print(self)
 
-    def toString(self):
-        result = 'Line: '
-        for p in self.line:
-            result += p.toString() + ' '
-        return result
+    def __str__(self):
+        return f'Line: {" ".join([str(x) for x in self.line])}'
 
     def __eq__(self, other):
         if other is None:
@@ -62,7 +62,7 @@ class Line(object):
         return False
 
 
-class Pyramid(object):
+class TriangularNim(object):
     player_mode_me = 1
     player_mode_other = 2
     player_mode_mask = 3
@@ -116,7 +116,6 @@ class Pyramid(object):
             line = line_obj.line
             if len(line) != 2:
                 continue
-            # line_obj.show()
 
             p0 = line[0]
             p1 = line[1]
@@ -140,15 +139,13 @@ class Pyramid(object):
                     new_line = Line([p0, p1, p2])
                     legal_move_temp.append(new_line)
 
-        # for LineTemp in legal_move_temp:
-        #     LineTemp.show()
         legal_move_temp = sorted(legal_move_temp, reverse=True)
 
         self.legal_move = legal_move_temp
 
     def show(self):
 
-        N = 0
+        n = 0
 
         for i in range(5):
             for ii in range(5 - i):
@@ -166,13 +163,13 @@ class Pyramid(object):
                 print('  ', end='')
             for ii in self.map[i]:
                 if not ii:
-                    Number = str(N)
-                    if len(Number) == 1:
-                        Number = '0' + Number
-                    print(Number + '  ', end='')
+                    number = str(n)
+                    if len(number) == 1:
+                        number = '0' + number
+                    print(number + '  ', end='')
                 else:
                     print('XX  ', end='')
-                N += 1
+                n += 1
             print('')
 
     def set_line(self, line):
@@ -183,19 +180,14 @@ class Pyramid(object):
         remove_list = []
 
         for p in line.line:
-            # p.show()
             self.map[p.y][p.x] = True
 
             for line_obj in self.legal_move:
-                # line_obj.show()
                 legal_line = line_obj.line
                 if p in legal_line and line_obj not in remove_list:
-                    # LegalMove.remove(line_obj)
                     remove_list.append(line_obj)
-                    # print('Remove!!!!')
 
         for remove_line in remove_list:
-            # remove_line.show()
             self.legal_move.remove(remove_line)
 
     def next_move_recursive(self, mode, level=-1):
@@ -223,8 +215,10 @@ class Pyramid(object):
 
         for possible_line in self.legal_move:
 
-            map_temp = deepcopy(self)
+            map_temp = copy_func(self)
             map_temp.set_line(possible_line)
+
+
 
             result = map_temp.next_move_recursive(
                 self.player_mode_mask - mode, level=(level + 1))
@@ -261,7 +255,7 @@ class Pyramid(object):
 
         global win_count
         global lose_count
-        global PointList
+        global all_point_list
 
         if last_line is not None:
             self.set_line(last_line)
@@ -270,25 +264,25 @@ class Pyramid(object):
         if len(self.legal_move) == 1:
             return None
 
-        if len(self.legal_move) == 63:
+        if not args.demo and len(self.legal_move) == 63:
             # 先手的話就下必勝路徑的第一手
             # 九種開場隨便挑，都 100 %
-            first_line_list = [
-                Line([PointList[0]]),
-                Line([PointList[10]]),
-                Line([PointList[14]]),
-                Line([PointList[3]]),
-                Line([PointList[4]]),
-                Line([PointList[5]]),
-                Line([PointList[7]]),
-                Line([PointList[8]]),
-                Line([PointList[12]])]
+            best_move_list = [
+                Line([all_point_list[0]]),
+                Line([all_point_list[10]]),
+                Line([all_point_list[14]]),
+                Line([all_point_list[3]]),
+                Line([all_point_list[4]]),
+                Line([all_point_list[5]]),
+                Line([all_point_list[7]]),
+                Line([all_point_list[8]]),
+                Line([all_point_list[12]])]
 
-            first_line_index = random.randint(0, len(first_line_list))
+            first_line_index = random.randint(0, len(best_move_list))
 
-            line_temp = first_line_list[first_line_index]
+            line_temp = best_move_list[first_line_index]
             # 就是這麼霸氣，直接給出勝率 100 % 的答案
-            print(line_temp.toString() + '獲勝機率為 100 %')
+            print(f'{line_temp} 獲勝機率為 100 %')
             self.set_line(line_temp)
             return line_temp
 
@@ -297,15 +291,15 @@ class Pyramid(object):
             max_rate_move = None
 
         logger.info('開始分析獲勝機率')
-        for PossibleLine in self.legal_move:
+        for possible_line in self.legal_move:
 
             win_count = 0
             lose_count = 0
 
-            pyramid_temp = deepcopy(self)
+            pyramid_temp = copy_func(self)
 
-            pyramid_temp.set_line(PossibleLine)
-            print(PossibleLine.toString(), end='')
+            pyramid_temp.set_line(possible_line)
+            print(possible_line, end='')
 
             recursive_result = pyramid_temp.next_move_recursive(
                 self.player_mode_other, level=0)
@@ -323,18 +317,18 @@ class Pyramid(object):
                 # 才需要紀錄最大勝率
                 if rate > max_rate:
                     max_rate = rate
-                    max_rate_move = PossibleLine
+                    max_rate_move = possible_line
                 # 判斷可接受勝率，所有可能跑完其實蠻慢的 QQ
                 if (rate * 100) >= min_acceptable_probability and not recursive_result:
-                    print('發現可接受獲勝機率為 ' + str(int(rate * 100)) + ' %')
-                    self.set_line(PossibleLine)
-                    return PossibleLine
+                    print(' 發現可接受獲勝機率為 ' + str(int(rate * 100)) + ' %')
+                    self.set_line(possible_line)
+                    return possible_line
 
-            print('獲勝機率為 ' + str(int(rate * 100)) + ' %')
+            print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
 
             if recursive_result:
-                self.set_line(PossibleLine)
-                return PossibleLine
+                self.set_line(possible_line)
+                return possible_line
             else:
                 pass
 
@@ -367,7 +361,7 @@ class Pyramid(object):
 
             point_list = []
             for n in number_list:
-                point_list.append(PointList[n])
+                point_list.append(all_point_list[n])
             result = Line(point_list)
 
             if result not in self.legal_move:
@@ -382,17 +376,21 @@ if __name__ == '__main__':
     logger = Logger('Nim')
     logger.info('Welcome to TriangularNim version', version)
 
+    parser = ArgumentParser()
+    parser.add_argument('-D', '--demo', help="count best move demo", action="store_true")
+    args = parser.parse_args()
+
     win_count = 0
     lose_count = 0
-    PointList = []
+    all_point_list = []
 
     for i in range(5):
         for ii in range(i + 1):
             p = Point(i, ii)
-            PointList.append(p)
+            all_point_list.append(p)
 
-    pyramid = Pyramid()
-    pyramid.show()
+    nim = TriangularNim()
+    nim.show()
     input_line = None
     player_first = False
     try:
@@ -401,21 +399,8 @@ if __name__ == '__main__':
             if c == '' or c.lower() == 'y':
                 logger.info('選擇先下')
 
-                # min_acceptable_probability = 0
-                # while True:
-                #     try:
-                #         min_acceptable_probability = input(
-                #             '請輸入電腦可接受獲勝機率 (0~100): ')
-                #         min_acceptable_probability = int(
-                #             min_acceptable_probability)
-                #         if 0 <= min_acceptable_probability <= 100:
-                #             break
-                #         logger.info('參數有誤，請重新輸入')
-                #     except Exception:
-                #         min_acceptable_probability = 0
-
                 player_first = True
-                input_line = pyramid.get_input_line()
+                input_line = nim.get_input_line()
 
                 break
             elif c.lower() == 'n':
@@ -424,25 +409,24 @@ if __name__ == '__main__':
             else:
                 logger.info('錯誤的輸入，請重新輸入')
 
-        while not pyramid.is_finish():
-            ComputerMove = pyramid.next_move(
+        while not nim.is_finish():
+            computer_move = nim.next_move(
                 last_line=input_line, player_first=player_first)
-            if ComputerMove is None:
-                logger.info('電腦認輸')
+            if computer_move is None:
+                logger.info('認輸')
                 break
-            pyramid.show()
-            print('電腦選擇 ', end='')
-            for p in ComputerMove.line:
-                point_str = str(PointList.index(p))
-                if len(point_str) == 1:
-                    point_str = '0' + point_str
-                print(point_str + ' ', end='')
-            print('')
+            nim.show()
 
-            if pyramid.is_finish():
+            next_move = []
+            for p in computer_move.line:
+                point_str = str(all_point_list.index(p))
+                next_move.append(point_str)
+            logger.info('下一步', ' '.join(next_move))
+
+            if nim.is_finish():
                 logger.info('電腦獲勝')
                 break
-            input_line = pyramid.get_input_line()
+            input_line = nim.get_input_line()
     except KeyboardInterrupt:
         logger.info('使用者中斷')
 
