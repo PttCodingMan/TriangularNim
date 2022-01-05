@@ -20,5 +20,5 @@
 
 [1]: https://zh.wikipedia.org/wiki/%E4%B8%89%E8%A7%92%E6%A3%8B
 
-## 遊玩畫面
+## 遊玩影片
 [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/YYnCp8yZIUw/0.jpg)](https://www.youtube.com/watch?v=YYnCp8yZIUw)
