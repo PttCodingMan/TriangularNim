@@ -1,5 +1,6 @@
 import random
 import re
+import sys
 from argparse import ArgumentParser
 from copy import deepcopy
 
@@ -13,7 +14,11 @@ def copy_func(o):
     return deepcopy(o)
 
 
-class Point(object):
+all_point_list = None
+count_map = {}
+
+
+class Point:
     def __init__(self, y, x):
         self.y = y
         self.x = x
@@ -22,7 +27,7 @@ class Point(object):
         print(self)
 
     def __str__(self):
-        result = f'{str(all_point_list.index(self)):02}'
+        result = f'{all_point_list.index(self):02}'
         return result
 
     def __eq__(self, other):
@@ -36,7 +41,7 @@ class Point(object):
         return False
 
 
-class Line(object):
+class Line:
     def __init__(self, point_list):
         self.line = sorted(point_list)
 
@@ -76,11 +81,20 @@ class TriangularNim(object):
             [False, False],
             [False, False, False],
             [False, False, False, False],
-            [False, False, False, False, False],
-        ]
+            [False, False, False, False, False]]
+
+        global all_point_list
+        all_point_list = []
+
+        for i in range(5):
+            for ii in range(i + 1):
+                p = Point(i, ii)
+                all_point_list.append(p)
+
+        self.win_count = 0
+        self.lose_count = 0
 
         self.legal_move = []
-
         legal_move_temp = []
 
         # length: 1
@@ -190,10 +204,18 @@ class TriangularNim(object):
         for remove_line in remove_list:
             self.legal_move.remove(remove_line)
 
+    def count_value(self):
+        result = 0
+        p = 1
+        for x in [x for sublist in self.map for x in sublist]:
+            result += (1 * p if x else 0)
+            p *= 2
+
+        return result
+
     def next_move_recursive(self, mode, level=-1):
 
-        global win_count
-        global lose_count
+        global count_map
 
         # True 我方獲勝
         if len(self.legal_move) == 1 and len(self.legal_move[0].line) == 1:
@@ -215,20 +237,28 @@ class TriangularNim(object):
 
         for possible_line in self.legal_move:
 
-            map_temp = copy_func(self)
-            map_temp.set_line(possible_line)
+            next_move_map = copy_func(self)
+            next_move_map.set_line(possible_line)
 
+            next_move_value = next_move_map.count_value()
 
+            if next_move_value in count_map:
+                restore_mode, restore_result = count_map[next_move_value]
 
-            result = map_temp.next_move_recursive(
-                self.player_mode_mask - mode, level=(level + 1))
+                result = restore_result if mode == restore_mode else not restore_result
+            else:
+                result = next_move_map.next_move_recursive(
+                    self.player_mode_mask - mode, level=(level + 1))
 
             if level == 0:
                 # 遞迴第一層紀錄一下可以獲勝的事件
                 if result:
-                    win_count += 1
+                    self.win_count += 1
                 else:
-                    lose_count += 1
+                    self.lose_count += 1
+
+            if next_move_value not in count_map:
+                count_map[next_move_value] = (mode, result)
 
             if mode == self.player_mode_me and result:
                 # 如果是換我方下 目標是找到 True (我方獲勝)
@@ -253,8 +283,6 @@ class TriangularNim(object):
 
     def next_move(self, last_line=None, player_first=False):
 
-        global win_count
-        global lose_count
         global all_point_list
 
         if last_line is not None:
@@ -278,9 +306,9 @@ class TriangularNim(object):
                 Line([all_point_list[8]]),
                 Line([all_point_list[12]])]
 
-            first_line_index = random.randint(0, len(best_move_list))
+            best_move_index = random.randrange(0, len(best_move_list))
 
-            line_temp = best_move_list[first_line_index]
+            line_temp = best_move_list[best_move_index]
             # 就是這麼霸氣，直接給出勝率 100 % 的答案
             print(f'{line_temp} 獲勝機率為 100 %')
             self.set_line(line_temp)
@@ -290,11 +318,14 @@ class TriangularNim(object):
             max_rate = 0
             max_rate_move = None
 
-        logger.info('開始分析獲勝機率')
+        if args.demo:
+            logger.info('分析第一手獲勝機率')
+        else:
+            logger.info('開始分析獲勝機率')
         for possible_line in self.legal_move:
 
-            win_count = 0
-            lose_count = 0
+            self.win_count = 0
+            self.lose_count = 0
 
             pyramid_temp = copy_func(self)
 
@@ -303,14 +334,14 @@ class TriangularNim(object):
 
             recursive_result = pyramid_temp.next_move_recursive(
                 self.player_mode_other, level=0)
-            if (win_count + lose_count) == 0:
+            if (self.win_count + self.lose_count) == 0:
                 # 表示這一層的嘗試就分出勝負了
                 if recursive_result:
                     rate = 1
                 else:
                     rate = 0
             else:
-                rate = win_count / (win_count + lose_count)
+                rate = self.win_count / (self.win_count + self.lose_count)
 
             if player_first:
                 # 只有玩家先行才有可能，所有嘗試都沒有 100 % 勝率，
@@ -326,13 +357,13 @@ class TriangularNim(object):
 
             print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
 
-            if recursive_result:
+            if not args.demo and recursive_result:
                 self.set_line(possible_line)
                 return possible_line
             else:
                 pass
 
-        if player_first:
+        if not args.demo and player_first:
             if max_rate_move is None:
                 self.computer_lose = True
             else:
@@ -380,53 +411,48 @@ if __name__ == '__main__':
     parser.add_argument('-D', '--demo', help="count best move demo", action="store_true")
     args = parser.parse_args()
 
-    win_count = 0
-    lose_count = 0
-    all_point_list = []
-
-    for i in range(5):
-        for ii in range(i + 1):
-            p = Point(i, ii)
-            all_point_list.append(p)
-
     nim = TriangularNim()
     nim.show()
+
     input_line = None
     player_first = False
     try:
-        while True:
-            c = input('你要先下嗎? [Y/n] ')
-            if c == '' or c.lower() == 'y':
-                logger.info('選擇先下')
+        if args.demo:
+            computer_move = nim.next_move()
+        else:
+            while True:
+                c = input('你要先下嗎? [Y/n] ')
+                if c == '' or c.lower() == 'y':
+                    logger.info('選擇先下')
 
-                player_first = True
+                    player_first = True
+                    input_line = nim.get_input_line()
+
+                    break
+                elif c.lower() == 'n':
+                    logger.info('選擇後下')
+                    break
+                else:
+                    logger.info('錯誤的輸入，請重新輸入')
+
+            while not nim.is_finish():
+                computer_move = nim.next_move(
+                    last_line=input_line, player_first=player_first)
+                if computer_move is None:
+                    logger.info('認輸')
+                    break
+                nim.show()
+
+                next_move = []
+                for p in computer_move.line:
+                    point_str = str(all_point_list.index(p))
+                    next_move.append(point_str)
+                logger.info('下一步', ' '.join(next_move))
+
+                if nim.is_finish():
+                    logger.info('電腦獲勝')
+                    break
                 input_line = nim.get_input_line()
-
-                break
-            elif c.lower() == 'n':
-                logger.info('選擇後下')
-                break
-            else:
-                logger.info('錯誤的輸入，請重新輸入')
-
-        while not nim.is_finish():
-            computer_move = nim.next_move(
-                last_line=input_line, player_first=player_first)
-            if computer_move is None:
-                logger.info('認輸')
-                break
-            nim.show()
-
-            next_move = []
-            for p in computer_move.line:
-                point_str = str(all_point_list.index(p))
-                next_move.append(point_str)
-            logger.info('下一步', ' '.join(next_move))
-
-            if nim.is_finish():
-                logger.info('電腦獲勝')
-                break
-            input_line = nim.get_input_line()
     except KeyboardInterrupt:
         logger.info('使用者中斷')
 
