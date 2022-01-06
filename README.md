@@ -13,7 +13,7 @@ Take turns to eliminate the person who draws the last one loses.
 
 This program proves that there is a winning path for all nine openings with the first move.  
 
-以下是九種存在必勝路徑的第一手 
+以下是九種存在必勝路徑的第一手  
 The following nine openings all has a winning path.
 - 0
 - 3
