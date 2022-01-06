@@ -1,11 +1,11 @@
+import json
+import os
 import random
 import re
 from argparse import ArgumentParser
 from copy import deepcopy
 
 from SingleLog.log import Logger
-
-from cache import cache
 
 version = '0.2.0'
 
@@ -15,7 +15,10 @@ def copy_func(o):
 
 
 all_point_list = None
-count_map = cache
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+with open(os.path.join(__location__, 'cache.json')) as f:
+    count_map = json.load(f)
 
 
 class Point:
@@ -320,7 +323,7 @@ class TriangularNim(object):
             max_rate_move = None
 
         if args.demo:
-            logger.info('分析第一手獲勝機率')
+            logger.info('分析所有可能第一手獲勝機率')
         else:
             logger.info('開始分析獲勝機率')
         for possible_line in self.legal_move:
@@ -415,8 +418,8 @@ if __name__ == '__main__':
     try:
         if args.demo:
             computer_move = nim.next_move()
-            # with open('src/cache.py', 'w') as f:
-            #     json.dump(count_map, f, indent=4)
+            # with open('src/cache.json', 'w') as f:
+            #     json.dump(count_map, f)
         else:
             while True:
                 c = input('你要先下嗎? [Y/n] ')
