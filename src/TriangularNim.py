@@ -15,10 +15,11 @@ def copy_func(o):
 
 
 all_point_list = None
+player_first = False
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 with open(os.path.join(__location__, 'cache.json')) as f:
-    count_map = json.load(f)
+    cache_map = json.load(f)
 
 
 class Point:
@@ -159,34 +160,29 @@ class TriangularNim(object):
 
         self.legal_move = sorted(legal_move_temp, reverse=True)
 
+    def __str__(self):
+        result = ''
+        size = 2
+
+        index = 0
+        for i in range(5):
+            for _ in range((5 - i - 1) * size):
+                result += ' '
+
+            line = []
+            for ii in range(i + 1):
+                if self.map[i][ii]:
+                    line.append('__')
+                else:
+                    line.append(f'{index:02}')
+                index += 1
+            result += '  '.join(line) + '\n'
+
+        return result
+
     def show(self):
 
-        n = 0
-
-        for i in range(5):
-            for ii in range(5 - i):
-                print(' ', end='')
-
-            for ii in self.map[i]:
-                if not ii:
-                    print('O ', end='')
-                else:
-                    print('X ', end='')
-
-            for ii in range(5 - i):
-                print(' ', end='')
-            for ii in range(5 - i):
-                print('  ', end='')
-            for ii in self.map[i]:
-                if not ii:
-                    number = str(n)
-                    if len(number) == 1:
-                        number = '0' + number
-                    print(number + '  ', end='')
-                else:
-                    print('XX  ', end='')
-                n += 1
-            print('')
+        print(self)
 
     def set_line(self, line):
         if line not in self.legal_move:
@@ -217,7 +213,7 @@ class TriangularNim(object):
 
     def next_move_recursive(self, mode, level=-1):
 
-        global count_map
+        global cache_map
 
         # True 我方獲勝
         if len(self.legal_move) == 1 and len(self.legal_move[0].line) == 1:
@@ -244,8 +240,8 @@ class TriangularNim(object):
 
             next_move_value = next_move_map.count_value()
 
-            if next_move_value in count_map:
-                temp_list = count_map[next_move_value]
+            if next_move_value in cache_map:
+                temp_list = cache_map[next_move_value]
                 restore_mode, restore_result = temp_list[0], temp_list[1]
 
                 result = (restore_result if mode == restore_mode else not restore_result)
@@ -260,8 +256,8 @@ class TriangularNim(object):
                 else:
                     self.lose_count += 1
 
-            if next_move_value not in count_map:
-                count_map[next_move_value] = [mode, result]
+            if next_move_value not in cache_map:
+                cache_map[next_move_value] = [mode, result]
 
             if mode == self.player_mode_me and result:
                 # 如果是換我方下 目標是找到 True (我方獲勝)
@@ -284,9 +280,10 @@ class TriangularNim(object):
         condition2 = self.computer_lose
         return condition0 or condition1 or condition2
 
-    def next_move(self, last_line=None, player_first=False):
+    def next_move(self, last_line=None):
 
         global all_point_list
+        global player_first
 
         if last_line is not None:
             self.set_line(last_line)
@@ -313,7 +310,8 @@ class TriangularNim(object):
 
             line_temp = best_move_list[best_move_index]
             # 就是這麼霸氣，直接給出勝率 100 % 的答案
-            print(f'{line_temp} 獲勝機率為 100 %')
+            if args.probability:
+                print(f'{line_temp} 獲勝機率為 100 %')
             self.set_line(line_temp)
             return line_temp
 
@@ -324,13 +322,14 @@ class TriangularNim(object):
         if args.demo:
             logger.info('分析所有可能第一手獲勝機率')
         else:
-            logger.info('開始分析獲勝機率')
+            logger.info('開始分析')
         for possible_line in self.legal_move:
 
             pyramid_temp = copy_func(self)
 
             pyramid_temp.set_line(possible_line)
-            print(possible_line, end='')
+            if args.demo or args.probability:
+                print(possible_line, end='')
 
             recursive_result, win_count, lose_count = pyramid_temp.next_move_recursive(
                 self.player_mode_other, level=0)
@@ -346,14 +345,13 @@ class TriangularNim(object):
                 rate = win_count / (win_count + lose_count)
 
             if player_first:
-
                 # 只有玩家先行才有可能，所有嘗試都沒有 100 % 勝率，
                 # 才需要紀錄最大勝率
                 if rate > max_rate:
                     max_rate = rate
                     max_rate_move = possible_line
-
-            print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
+            if args.demo or args.probability:
+                print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
 
             if not args.demo and recursive_result:
                 self.set_line(possible_line)
@@ -371,8 +369,17 @@ class TriangularNim(object):
         return None
 
     def get_input_line(self):
+        global player_first
         while True:
-            line_str = input('請按照右邊的編號輸入你想要畫的線 1 ~ 3 個: ')
+            if len(self.legal_move) == 63:
+                line_str = input('請按照上方的編號輸入你想要畫的線 1 ~ 3 個 (Enter 電腦先下): ')
+                if line_str == '':
+                    return None
+                else:
+                    player_first = True
+
+            else:
+                line_str = input('請按照上方的編號輸入你想要畫的線 1 ~ 3 個: ')
             number_list = re.findall(r'\d+', line_str)
             number_list = list(map(int, number_list))
 
@@ -407,47 +414,33 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument('-D', '--demo', help="count best move demo", action="store_true")
+    parser.add_argument('-P', '--probability', help="show probability", action="store_true")
     args = parser.parse_args()
 
     nim = TriangularNim()
     nim.show()
 
     input_line = None
-    player_first = False
     try:
         if args.demo:
             computer_move = nim.next_move()
             # with open('src/cache.json', 'w') as f:
             #     json.dump(count_map, f)
         else:
-            while True:
-                c = input('你要先下嗎? [Y/n] ')
-                if c == '' or c.lower() == 'y':
-                    logger.info('選擇先下')
-
-                    player_first = True
-                    input_line = nim.get_input_line()
-
-                    break
-                elif c.lower() == 'n':
-                    logger.info('選擇後下')
-                    break
-                else:
-                    logger.info('錯誤的輸入，請重新輸入')
-
+            input_line = nim.get_input_line()
             while not nim.is_finish():
-                computer_move = nim.next_move(
-                    last_line=input_line, player_first=player_first)
+                computer_move = nim.next_move(last_line=input_line)
                 if computer_move is None:
                     logger.info('認輸')
                     break
-                nim.show()
 
                 next_move = []
                 for p in computer_move.line:
                     point_str = str(all_point_list.index(p))
                     next_move.append(point_str)
                 logger.info('下一步', ' '.join(next_move))
+
+                nim.show()
 
                 if nim.is_finish():
                     logger.info('電腦獲勝')

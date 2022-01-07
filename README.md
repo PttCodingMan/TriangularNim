@@ -34,10 +34,15 @@ Play with computer.
 ```bash
 python3 src/TriangularNim.py
 ```
+跟電腦玩，顯示機率。  
+Play with computer and show probability.
+```bash
+python3 src/TriangularNim.py --probability or -P
+```
 計算必勝開局展示。  
 Count best move demo
 ```bash
-python3 src/TriangularNim.py --demo
+python3 src/TriangularNim.py --demo or -D
 ```
 
 ## Video 遊玩影片
