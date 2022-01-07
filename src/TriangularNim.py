@@ -100,6 +100,7 @@ class TriangularNim(object):
         self.legal_move = []
         legal_move_temp = []
 
+        # 把所有可能的步驟列出來
         # length: 1
         for i in range(5):
             for ii in range(i + 1):
@@ -156,9 +157,7 @@ class TriangularNim(object):
                     new_line = Line([p0, p1, p2])
                     legal_move_temp.append(new_line)
 
-        legal_move_temp = sorted(legal_move_temp, reverse=True)
-
-        self.legal_move = legal_move_temp
+        self.legal_move = sorted(legal_move_temp, reverse=True)
 
     def show(self):
 
