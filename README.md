@@ -42,3 +42,6 @@ python3 src/TriangularNim.py --demo
 
 ## Video 遊玩影片
 [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/YYnCp8yZIUw/0.jpg)](https://www.youtube.com/watch?v=YYnCp8yZIUw)
+
+## 獲勝機率公式 Winning probability formula
+![](https://i.imgur.com/itphpT7.png)
