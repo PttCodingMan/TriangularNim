@@ -4,413 +4,298 @@ import random
 import re
 from argparse import ArgumentParser
 from copy import deepcopy
+from typing import List, Optional, Tuple, Set
 
 from SingleLog.log import Logger
 
-version = '0.2.0'
+version = '0.2.2'  # Bump version for the changes
 
-
-def copy_func(o):
-    return deepcopy(o)
-
-
-all_point_list = None
-player_first = False
+# The real path to the directory containing this script
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-with open(os.path.join(__location__, 'cache.json')) as f:
-    cache_map = json.load(f)
 
 
 class Point:
-    def __init__(self, y, x):
+    """Represents a single point on the triangular board."""
+    all_point_list: List['Point'] = []
+
+    def __init__(self, y: int, x: int):
         self.y = y
         self.x = x
 
-    def show(self):
+    def show(self) -> None:
         print(self)
 
-    def __str__(self):
-        result = f'{all_point_list.index(self):02}'
-        return result
+    def __str__(self) -> str:
+        try:
+            index = Point.all_point_list.index(self)
+            return f'{index:02}'
+        except (ValueError, AttributeError):
+            return '??'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Point):
+            return NotImplemented
         return self.y == other.y and self.x == other.x
 
-    def __lt__(self, other):
-        if self.y < other.y:
-            return True
-        if self.x < other.x:
-            return True
-        return False
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, Point):
+            return NotImplemented
+        if self.y != other.y:
+            return self.y < other.y
+        return self.x < other.x
+
+    def __hash__(self) -> int:
+        return hash((self.y, self.x))
 
 
 class Line:
-    def __init__(self, point_list):
-        self.line = sorted(point_list)
+    """Represents a line of 1 to 3 points that can be drawn in a move."""
+    def __init__(self, point_list: List[Point]):
+        self.line: List[Point] = sorted(point_list)
 
-    def show(self):
+    def show(self) -> None:
         print(self)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'Line: {" ".join([str(x) for x in self.line])}'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if other is None:
             return False
+        if not isinstance(other, Line):
+            return NotImplemented
         if len(self.line) != len(other.line):
             return False
-        for i in range(len(self.line)):
-            if self.line[i] != other.line[i]:
-                return False
-        return True
+        return self.line == other.line
 
-    def __lt__(self, other):
-        if len(self.line) < len(other.line):
-            return True
-        return False
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, Line):
+            return NotImplemented
+        if len(self.line) != len(other.line):
+            return len(self.line) < len(other.line)
+        return self.line < other.line
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.line))
 
 
 class TriangularNim(object):
-    player_mode_me = 1
-    player_mode_other = 2
-    player_mode_mask = 3
+    """Encapsulates the entire game logic for Triangular Nim."""
+    player_mode_me: int = 1
+    player_mode_other: int = 2
+    player_mode_mask: int = 3
+
+    BOARD_SIZE: int = 5
+    NUM_POINTS: int = 15
 
     def __init__(self):
+        self.player_first: bool = False
+        self.map: List[List[bool]] = [[False for _ in range(i + 1)] for i in range(self.BOARD_SIZE)]
 
-        self.computer_lose = False
-
-        self.map = [
-            [False],
-            [False, False],
-            [False, False, False],
-            [False, False, False, False],
-            [False, False, False, False, False]]
-
-        global all_point_list
-        all_point_list = []
-
-        for i in range(5):
+        self.all_point_list: List[Point] = []
+        for i in range(self.BOARD_SIZE):
             for ii in range(i + 1):
                 p = Point(i, ii)
-                all_point_list.append(p)
+                self.all_point_list.append(p)
+        Point.all_point_list = self.all_point_list
 
-        self.win_count = 0
-        self.lose_count = 0
+        try:
+            with open(os.path.join(__location__, 'cache.json')) as f:
+                self.cache_map: dict = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.cache_map = {}
 
-        self.legal_move = []
-        legal_move_temp = []
+        self.win_count: int = 0
+        self.lose_count: int = 0
+        self.legal_move: List[Line] = self._generate_legal_moves()
 
-        # 把所有可能的步驟列出來
-        # length: 1
-        for i in range(5):
-            for ii in range(i + 1):
-                p = Point(i, ii)
-                l = Line([p])
-                legal_move_temp.append(l)
-        # length: 2
-        for y in range(5):
+    def _generate_legal_moves(self) -> List[Line]:
+        """Generates all possible lines that can be drawn on the board."""
+        legal_move_temp: List[Line] = []
+        
+        # --- Generate lines of length 1 ----
+        for p in self.all_point_list:
+            legal_move_temp.append(Line([p]))
+
+        all_points_set: Set[Point] = set(self.all_point_list)
+
+        # --- Generate lines of length 2 --- 
+        for y in range(self.BOARD_SIZE):
             for x in range(y + 1):
-
                 start_p = Point(y, x)
-                p = Point(y, x + 1)
-                l = Line([p])
-                if l in legal_move_temp:
-                    new_line = Line([start_p, p])
-                    legal_move_temp.append(new_line)
+                # Horizontal
+                if Point(y, x + 1) in all_points_set:
+                    legal_move_temp.append(Line([start_p, Point(y, x + 1)]))
+                # Diagonal down-left
+                if Point(y + 1, x) in all_points_set:
+                    legal_move_temp.append(Line([start_p, Point(y + 1, x)]))
+                # Diagonal down-right
+                if Point(y + 1, x + 1) in all_points_set:
+                    legal_move_temp.append(Line([start_p, Point(y + 1, x + 1)]))
 
-                p = Point(y + 1, x)
-                l = Line([p])
-                if l in legal_move_temp:
-                    new_line = Line([start_p, p])
-                    legal_move_temp.append(new_line)
+        # --- Generate lines of length 3 --- 
+        temp_len_2_lines = [l for l in legal_move_temp if len(l.line) == 2]
+        for line_obj in temp_len_2_lines:
+            p0, p1 = line_obj.line[0], line_obj.line[1]
+            # Horizontal
+            if p0.y == p1.y and p0.x + 1 == p1.x and Point(p1.y, p1.x + 1) in all_points_set:
+                legal_move_temp.append(Line([p0, p1, Point(p1.y, p1.x + 1)]))
+            # Diagonal down-left
+            if p0.y + 1 == p1.y and p0.x == p1.x and Point(p1.y + 1, p1.x) in all_points_set:
+                legal_move_temp.append(Line([p0, p1, Point(p1.y + 1, p1.x)]))
+            # Diagonal down-right
+            if p0.y + 1 == p1.y and p0.x + 1 == p1.x and Point(p1.y + 1, p1.x + 1) in all_points_set:
+                legal_move_temp.append(Line([p0, p1, Point(p1.y + 1, p1.x + 1)]))
 
-                p = Point(y + 1, x + 1)
-                l = Line([p])
-                if l in legal_move_temp:
-                    new_line = Line([start_p, p])
-                    legal_move_temp.append(new_line)
+        # Use a set to remove duplicates before sorting
+        return sorted(list(set(legal_move_temp)), reverse=True)
 
-        for line_obj in legal_move_temp:
-            line = line_obj.line
-            if len(line) != 2:
-                continue
-
-            p0 = line[0]
-            p1 = line[1]
-
-            if p0.y == p1.y and p0.x + 1 == p1.x:
-                p2 = Point(p1.y, p1.x + 1)
-                l = Line([p2])
-                if l in legal_move_temp:
-                    new_line = Line([p0, p1, p2])
-                    legal_move_temp.append(new_line)
-            if p0.y + 1 == p1.y and p0.x == p1.x:
-                p2 = Point(p1.y + 1, p1.x)
-                l = Line([p2])
-                if l in legal_move_temp:
-                    new_line = Line([p0, p1, p2])
-                    legal_move_temp.append(new_line)
-            if p0.y + 1 == p1.y and p0.x + 1 == p1.x:
-                p2 = Point(p1.y + 1, p1.x + 1)
-                l = Line([p2])
-                if l in legal_move_temp:
-                    new_line = Line([p0, p1, p2])
-                    legal_move_temp.append(new_line)
-
-        self.legal_move = sorted(legal_move_temp, reverse=True)
-
-    def __str__(self):
+    def __str__(self) -> str:
         result = ''
         size = 2
-
         index = 0
-        for i in range(5):
-            for _ in range((5 - i - 1) * size):
-                result += ' '
-
-            line = []
+        for i in range(self.BOARD_SIZE):
+            result += ' ' * ((self.BOARD_SIZE - i - 1) * size)
+            line_items = []
             for ii in range(i + 1):
                 if self.map[i][ii]:
-                    line.append('__')
+                    line_items.append('__')
                 else:
-                    line.append(f'{index:02}')
+                    line_items.append(f'{index:02}')
                 index += 1
-            result += '  '.join(line) + '\n'
-
+            result += '  '.join(line_items) + '\n'
         return result
 
-    def show(self):
-
+    def show(self) -> None:
         print(self)
 
-    def set_line(self, line):
+    def set_line(self, line: Line) -> None:
         if line not in self.legal_move:
             print('[Error] Not in Legal move')
             return
-
-        remove_list = []
-
         for p in line.line:
             self.map[p.y][p.x] = True
+        self.legal_move = [m for m in self.legal_move if not any(p in m.line for p in line.line)]
 
-            for line_obj in self.legal_move:
-                legal_line = line_obj.line
-                if p in legal_line and line_obj not in remove_list:
-                    remove_list.append(line_obj)
-
-        for remove_line in remove_list:
-            self.legal_move.remove(remove_line)
-
-    def count_value(self):
+    def count_value(self) -> str:
         result = 0
         p = 1
-        for x in [x for sublist in self.map for x in sublist]:
-            result += (1 * p if x else 0)
-            p *= 2
+        for row in self.map:
+            for cell in row:
+                result += (1 * p if cell else 0)
+                p *= 2
+        return str(result)
 
-        return f'{result}'
-
-    def next_move_recursive(self, mode, level=-1):
-
-        global cache_map
-
-        # True 我方獲勝
+    def next_move_recursive(self, mode: int, level: int = -1) -> Tuple[bool, int, int]:
         if len(self.legal_move) == 1 and len(self.legal_move[0].line) == 1:
-            # 只剩下最後一格的情況
-            if mode == self.player_mode_me:
-                # 如果是我方，則輸 False
-                return False, 0, 1
-            else:
-                # 如果是對方，則贏 True
-                return True, 1, 0
-        elif len(self.legal_move) == 0:
-            # 已經沒有圈圈可以畫了，表示上一輪就結束了
-            if mode == self.player_mode_me:
-                # 如果是我方，則贏 True
-                return True, 1, 0
-            else:
-                # 如果是對方，則輸 False
-                return False, 0, 1
+            return (mode == self.player_mode_other, 1, 0) if mode == self.player_mode_other else (False, 0, 1)
+        elif not self.legal_move:
+            return (mode == self.player_mode_me, 1, 0) if mode == self.player_mode_me else (False, 0, 1)
 
         for possible_line in self.legal_move:
-
-            next_move_map = copy_func(self)
+            next_move_map = deepcopy(self)
             next_move_map.set_line(possible_line)
-
             next_move_value = next_move_map.count_value()
 
-            if next_move_value in cache_map:
-                temp_list = cache_map[next_move_value]
+            if next_move_value in self.cache_map:
+                temp_list = self.cache_map[next_move_value]
                 restore_mode, restore_result = temp_list[0], temp_list[1]
-
                 result = (restore_result if mode == restore_mode else not restore_result)
             else:
-                result, _, _ = next_move_map.next_move_recursive(
-                    self.player_mode_mask - mode, level=(level + 1))
+                result, _, _ = next_move_map.next_move_recursive(self.player_mode_mask - mode, level + 1)
 
             if level == 0:
-                # 遞迴第一層紀錄一下可以獲勝的事件
-                if result:
-                    self.win_count += 1
-                else:
-                    self.lose_count += 1
+                if result: self.win_count += 1
+                else: self.lose_count += 1
 
-            if next_move_value not in cache_map:
-                cache_map[next_move_value] = [mode, result]
+            if next_move_value not in self.cache_map:
+                self.cache_map[next_move_value] = [mode, result]
 
             if mode == self.player_mode_me and result:
-                # 如果是換我方下 目標是找到 True (我方獲勝)
                 return True, self.win_count, self.lose_count
             elif mode == self.player_mode_other and not result:
-                # 如果是換對方下 目標是找到 False (我方失敗)
                 return False, self.win_count, self.lose_count
 
-        if mode == self.player_mode_me:
-            # 如果我方都找不到獲勝的下一步，則回傳 False
-            return False, self.win_count, self.lose_count
-        elif mode == self.player_mode_other:
-            # 如果對方都找不到讓我方失敗的下一步，則回傳 True (我方獲勝)
-            return True, self.win_count, self.lose_count
+        return (mode == self.player_mode_other, self.win_count, self.lose_count)
 
-    def is_finish(self):
-        condition0 = len(self.legal_move) == 1 and len(
-            self.legal_move[0].line) == 1
-        condition1 = len(self.legal_move) == 0
-        condition2 = self.computer_lose
-        return condition0 or condition1 or condition2
+    def is_finish(self) -> bool:
+        return not self.legal_move
 
-    def next_move(self, last_line=None):
-
-        global all_point_list
-        global player_first
-
-        if last_line is not None:
+    def next_move(self, last_line: Optional[Line] = None) -> Optional[Line]:
+        if last_line:
             self.set_line(last_line)
             self.show()
-
-        if len(self.legal_move) == 1:
+        if self.is_finish():
             return None
 
-        if not args.demo and len(self.legal_move) == 63:
-            # 先手的話就下必勝路徑的第一手
-            # 九種開場隨便挑，都 100 %
-            best_move_list = [
-                Line([all_point_list[0]]),
-                Line([all_point_list[10]]),
-                Line([all_point_list[14]]),
-                Line([all_point_list[3]]),
-                Line([all_point_list[4]]),
-                Line([all_point_list[5]]),
-                Line([all_point_list[7]]),
-                Line([all_point_list[8]]),
-                Line([all_point_list[12]])]
-
-            best_move_index = random.randrange(0, len(best_move_list))
-
-            line_temp = best_move_list[best_move_index]
-            # 就是這麼霸氣，直接給出勝率 100 % 的答案
+        if not args.demo and not self.player_first and len(self.legal_move) == 63:
+            best_move_list = [Line([self.all_point_list[i]]) for i in [0, 10, 14, 3, 4, 5, 7, 8, 12]]
+            line_temp = random.choice(best_move_list)
             if args.probability:
                 print(f'{line_temp} 獲勝機率為 100 %')
             self.set_line(line_temp)
             return line_temp
 
-        if player_first:
-            max_rate = 0
-            max_rate_move = None
+        max_rate = -1.0
+        max_rate_move: Optional[Line] = None
+        winning_move: Optional[Line] = None
 
-        if args.demo:
-            logger.info('分析所有可能第一手獲勝機率')
-        else:
-            logger.info('開始分析')
+        logger.info('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
         for possible_line in self.legal_move:
-
-            pyramid_temp = copy_func(self)
-
+            pyramid_temp = deepcopy(self)
             pyramid_temp.set_line(possible_line)
             if args.demo or args.probability:
                 print(possible_line, end='')
 
-            recursive_result, win_count, lose_count = pyramid_temp.next_move_recursive(
-                self.player_mode_other, level=0)
+            pyramid_temp.win_count, pyramid_temp.lose_count = 0, 0
+            recursive_result, win_count, lose_count = pyramid_temp.next_move_recursive(self.player_mode_other, level=0)
+            
+            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if recursive_result else 0.0)
 
-            logger.debug('count', win_count, lose_count)
-            if (win_count + lose_count) == 0:
-                # 表示這一層的嘗試就分出勝負了
-                if recursive_result:
-                    rate = 1
-                else:
-                    rate = 0
-            else:
-                rate = win_count / (win_count + lose_count)
-
-            if player_first:
-                # 只有玩家先行才有可能，所有嘗試都沒有 100 % 勝率，
-                # 才需要紀錄最大勝率
-                if rate > max_rate:
-                    max_rate = rate
-                    max_rate_move = possible_line
+            if rate > max_rate:
+                max_rate = rate
+                max_rate_move = possible_line
+            
             if args.demo or args.probability:
-                print(' 獲勝機率為 ' + str(int(rate * 100)) + ' %')
+                print(f' 獲勝機率為 {int(rate * 100)} %')
 
             if not args.demo and recursive_result:
-                self.set_line(possible_line)
-                return possible_line
-            else:
-                pass
+                winning_move = possible_line
+                break
+        
+        best_move = winning_move if winning_move else max_rate_move
+        if best_move:
+            self.set_line(best_move)
+        return best_move
 
-        if not args.demo and player_first:
-            if max_rate_move is None:
-                self.computer_lose = True
-            else:
-                self.set_line(max_rate_move)
-            return max_rate_move
-
-        return None
-
-    def get_input_line(self):
-        global player_first
+    def get_input_line(self) -> Optional[Line]:
         while True:
+            prompt = '請按照上方的編號輸入你想要畫的線 1 ~ 3 個'
             if len(self.legal_move) == 63:
-                line_str = input('請按照上方的編號輸入你想要畫的線 1 ~ 3 個 (Enter 電腦先下): ')
-                if line_str == '':
-                    return None
-                else:
-                    player_first = True
-
+                prompt += ' (Enter 電腦先下): '
+                line_str = input(prompt)
+                if line_str == '': return None
+                self.player_first = True
             else:
-                line_str = input('請按照上方的編號輸入你想要畫的線 1 ~ 3 個: ')
-            number_list = re.findall(r'\d+', line_str)
-            number_list = list(map(int, number_list))
+                line_str = input(prompt + ': ')
 
-            if len(number_list) < 1 or 3 < len(number_list):
-                logger.info('輸入錯誤')
+            try:
+                number_list = [int(n) for n in re.findall(r'\d+', line_str)]
+                if not (1 <= len(number_list) <= 3): raise ValueError("僅能輸入 1 到 3 個數字")
+                if not all(0 <= n < self.NUM_POINTS for n in number_list): raise ValueError(f"請輸入 0 ~ {self.NUM_POINTS - 1} 之間的數字")
+                
+                point_list = [self.all_point_list[n] for n in number_list]
+                result = Line(point_list)
+                if result not in self.legal_move: raise ValueError("不合法的輸入")
+                
+                return result
+            except ValueError as e:
+                logger.info(e)
                 continue
-
-            input_ok = True
-            for n in number_list:
-                if n < 0 or 14 < n:
-                    logger.info('請輸入 0 ~ 14 之間的數字')
-                    input_ok = False
-            if not input_ok:
-                continue
-
-            point_list = []
-            for n in number_list:
-                point_list.append(all_point_list[n])
-            result = Line(point_list)
-
-            if result not in self.legal_move:
-                logger.info('不合法的輸入')
-                continue
-            break
-
-        return Line(point_list)
-
 
 if __name__ == '__main__':
     logger = Logger('Nim')
-    logger.info('Welcome to TriangularNim version', version)
+    logger.info(f'Welcome to TriangularNim version {version}')
 
     parser = ArgumentParser()
     parser.add_argument('-D', '--demo', help="count best move demo", action="store_true")
@@ -418,35 +303,37 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     nim = TriangularNim()
-    nim.show()
-
-    input_line = None
     try:
         if args.demo:
-            computer_move = nim.next_move()
-            # with open('src/cache.json', 'w') as f:
-            #     json.dump(count_map, f)
+            nim.show()
+            nim.next_move()
         else:
+            nim.show()
             input_line = nim.get_input_line()
+            # Main game loop
             while not nim.is_finish():
                 computer_move = nim.next_move(last_line=input_line)
-                if computer_move is None:
-                    logger.info('認輸')
+                if not computer_move:
+                    logger.info('您拿走了最後的棋子，您輸了！')
                     break
-
-                next_move = []
-                for p in computer_move.line:
-                    point_str = str(all_point_list.index(p))
-                    next_move.append(point_str)
-                logger.info('下一步', ' '.join(next_move))
-
+                
+                move_indices = [str(nim.all_point_list.index(p)) for p in computer_move.line]
+                logger.info(f"電腦下: {' '.join(move_indices)}")
                 nim.show()
 
                 if nim.is_finish():
-                    logger.info('電腦獲勝')
+                    logger.info('電腦拿走了最後的棋子，您獲勝了！')
                     break
+                
                 input_line = nim.get_input_line()
     except KeyboardInterrupt:
-        logger.info('使用者中斷')
-
-    logger.info('遊戲結束')
+        logger.info('\n使用者中斷')
+    except Exception as e:
+        logger.error(f"發生未預期的錯誤: {e}", exc_info=True)
+    finally:
+        logger.info('遊戲結束')
+        if nim.cache_map:
+            logger.info('正在儲存快取...')
+            with open(os.path.join(__location__, 'cache.json'), 'w') as f:
+                json.dump(nim.cache_map, f, indent=2)
+            logger.info('快取已儲存。')
