@@ -47,7 +47,8 @@ class Point:
 
 
 class Line:
-    """Represents a line of 1 to 3 points that can be drawn in a move."""
+    """Represents a line of 1 to 3 points that can be taken in a move."""
+
     def __init__(self, point_list: List[Point]):
         self.line: List[Point] = sorted(point_list)
 
@@ -100,6 +101,7 @@ class TriangularNim(object):
         try:
             with open(os.path.join(__location__, 'cache.json')) as f:
                 self.cache_map: dict = json.load(f)
+
         except (FileNotFoundError, json.JSONDecodeError):
             self.cache_map = {}
 
@@ -110,7 +112,7 @@ class TriangularNim(object):
     def _generate_legal_moves(self) -> List[Line]:
         """Generates all possible lines that can be drawn on the board."""
         legal_move_temp: List[Line] = []
-        
+
         # --- Generate lines of length 1 ---
         for p in self.all_point_list:
             legal_move_temp.append(Line([p]))
@@ -167,13 +169,28 @@ class TriangularNim(object):
     def show(self) -> None:
         print(self)
 
-    def set_line(self, line: Line) -> None:
+    def set_line(self, line: Line, is_permanent: bool = True) -> Optional[List[Line]]:
+        """Applies a move to the board. If not permanent, returns removed moves for later reversal."""
         if line not in self.legal_move:
             print('[Error] Not in Legal move')
-            return
+            return None
+
         for p in line.line:
             self.map[p.y][p.x] = True
-        self.legal_move = [m for m in self.legal_move if not any(p in m.line for p in line.line)]
+
+        removed_moves = [m for m in self.legal_move if any(p in m.line for p in line.line)]
+        self.legal_move = [m for m in self.legal_move if m not in removed_moves]
+
+        if not is_permanent:
+            return removed_moves
+        return None
+
+    def revert_line(self, line: Line, removed_moves: List[Line]) -> None:
+        """Reverts a move to restore the previous game state."""
+        for p in line.line:
+            self.map[p.y][p.x] = False
+        self.legal_move.extend(removed_moves)
+        self.legal_move.sort(reverse=True)
 
     def count_value(self) -> str:
         result = 0
@@ -190,21 +207,26 @@ class TriangularNim(object):
         elif not self.legal_move:
             return (mode == self.player_mode_me, 1, 0) if mode == self.player_mode_me else (False, 0, 1)
 
-        for possible_line in self.legal_move:
-            next_move_map = deepcopy(self)
-            next_move_map.set_line(possible_line)
-            next_move_value = next_move_map.count_value()
+        # The loop now uses backtracking instead of deepcopy
+        for possible_line in self.legal_move[:]:  # Iterate over a copy
+            removed = self.set_line(possible_line, is_permanent=False)
+            if removed is None: continue
 
+            next_move_value = self.count_value()
             if next_move_value in self.cache_map:
                 temp_list = self.cache_map[next_move_value]
                 restore_mode, restore_result = temp_list[0], temp_list[1]
                 result = (restore_result if mode == restore_mode else not restore_result)
             else:
-                result, _, _ = next_move_map.next_move_recursive(self.player_mode_mask - mode, level + 1)
+                result, _, _ = self.next_move_recursive(self.player_mode_mask - mode, level + 1)
+
+            self.revert_line(possible_line, removed)
 
             if level == 0:
-                if result: self.win_count += 1
-                else: self.lose_count += 1
+                if result:
+                    self.win_count += 1
+                else:
+                    self.lose_count += 1
 
             if next_move_value not in self.cache_map:
                 self.cache_map[next_move_value] = [mode, result]
@@ -240,7 +262,7 @@ class TriangularNim(object):
 
         print('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
         # The main analysis loop now also uses backtracking
-        for possible_line in self.legal_move[:]: # Iterate over a copy
+        for possible_line in self.legal_move[:]:  # Iterate over a copy
             if args.demo or args.probability:
                 print(possible_line, end='')
 
@@ -249,22 +271,23 @@ class TriangularNim(object):
 
             self.win_count, self.lose_count = 0, 0
             recursive_result, win_count, lose_count = self.next_move_recursive(self.player_mode_other, level=0)
-            
+
             self.revert_line(possible_line, removed)
 
-            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if recursive_result else 0.0)
+            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (
+                1.0 if recursive_result else 0.0)
 
             if rate > max_rate:
                 max_rate = rate
                 max_rate_move = possible_line
-            
+
             if args.demo or args.probability:
                 print(f' 獲勝機率為 {int(rate * 100)} %')
 
             if not args.demo and not args.probability and recursive_result:
                 winning_move = possible_line
                 break
-        
+
         best_move = winning_move if winning_move else max_rate_move
         if best_move:
             self.set_line(best_move)
@@ -284,16 +307,18 @@ class TriangularNim(object):
             try:
                 number_list = [int(n) for n in re.findall(r'\d+', line_str)]
                 if not (1 <= len(number_list) <= 3): raise ValueError("僅能輸入 1 到 3 個數字")
-                if not all(0 <= n < self.NUM_POINTS for n in number_list): raise ValueError(f"請輸入 0 ~ {self.NUM_POINTS - 1} 之間的數字")
-                
+                if not all(0 <= n < self.NUM_POINTS for n in number_list): raise ValueError(
+                    f"請輸入 0 ~ {self.NUM_POINTS - 1} 之間的數字")
+
                 point_list = [self.all_point_list[n] for n in number_list]
                 result = Line(point_list)
                 if result not in self.legal_move: raise ValueError("不合法的輸入")
-                
+
                 return result
             except ValueError as e:
                 print(e)
                 continue
+
 
 if __name__ == '__main__':
     print(f'Welcome to TriangularNim version {version}')
@@ -317,7 +342,7 @@ if __name__ == '__main__':
                 if not computer_move:
                     print('您拿走了最後的棋子，您輸了！')
                     break
-                
+
                 move_indices = [str(nim.all_point_list.index(p)) for p in computer_move.line]
                 print(f"電腦下: {' '.join(move_indices)}")
                 nim.show()
@@ -325,7 +350,7 @@ if __name__ == '__main__':
                 if nim.is_finish():
                     print('電腦拿走了最後的棋子，您獲勝了！')
                     break
-                
+
                 input_line = nim.get_input_line()
     except KeyboardInterrupt:
         print('\n使用者中斷')
