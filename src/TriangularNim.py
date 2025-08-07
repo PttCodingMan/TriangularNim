@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from copy import deepcopy
 from typing import List, Optional, Tuple, Set
 
-version = '0.2.3'  # Bump version for the changes
+version = '0.3.0'  # Bump version for the changes
 
 # The real path to the directory containing this script
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -239,26 +239,29 @@ class TriangularNim(object):
         winning_move: Optional[Line] = None
 
         print('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
-        for possible_line in self.legal_move:
-            pyramid_temp = deepcopy(self)
-            pyramid_temp.cache_map = self.cache_map  # Ensure the cache is shared, not copied
-            pyramid_temp.set_line(possible_line)
+        # The main analysis loop now also uses backtracking
+        for possible_line in self.legal_move[:]: # Iterate over a copy
             if args.demo or args.probability:
                 print(possible_line, end='')
 
-            pyramid_temp.win_count, pyramid_temp.lose_count = 0, 0
-            win_in_recursive, win_count, lose_count = pyramid_temp.next_move_recursive(self.player_mode_other, level=0)
-            
-            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if win_in_recursive else 0.0)
+            removed = self.set_line(possible_line, is_permanent=False)
+            if removed is None: continue
 
-            if args.demo or args.probability:
-                print(f' 獲勝機率為 {int(rate * 100)} %')
+            self.win_count, self.lose_count = 0, 0
+            recursive_result, win_count, lose_count = self.next_move_recursive(self.player_mode_other, level=0)
+            
+            self.revert_line(possible_line, removed)
+
+            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if recursive_result else 0.0)
 
             if rate > max_rate:
                 max_rate = rate
                 max_rate_move = possible_line
+            
+            if args.demo or args.probability:
+                print(f' 獲勝機率為 {int(rate * 100)} %')
 
-            if not args.demo and not args.probability and win_in_recursive:
+            if not args.demo and not args.probability and recursive_result:
                 winning_move = possible_line
                 break
         
