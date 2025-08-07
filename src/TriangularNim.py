@@ -6,9 +6,7 @@ from argparse import ArgumentParser
 from copy import deepcopy
 from typing import List, Optional, Tuple, Set
 
-from SingleLog.log import Logger
-
-version = '0.2.2'  # Bump version for the changes
+version = '0.2.3'  # Bump version for the changes
 
 # The real path to the directory containing this script
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -113,13 +111,13 @@ class TriangularNim(object):
         """Generates all possible lines that can be drawn on the board."""
         legal_move_temp: List[Line] = []
         
-        # --- Generate lines of length 1 ----
+        # --- Generate lines of length 1 ---
         for p in self.all_point_list:
             legal_move_temp.append(Line([p]))
 
         all_points_set: Set[Point] = set(self.all_point_list)
 
-        # --- Generate lines of length 2 --- 
+        # --- Generate lines of length 2 ---
         for y in range(self.BOARD_SIZE):
             for x in range(y + 1):
                 start_p = Point(y, x)
@@ -133,7 +131,7 @@ class TriangularNim(object):
                 if Point(y + 1, x + 1) in all_points_set:
                     legal_move_temp.append(Line([start_p, Point(y + 1, x + 1)]))
 
-        # --- Generate lines of length 3 --- 
+        # --- Generate lines of length 3 ---
         temp_len_2_lines = [l for l in legal_move_temp if len(l.line) == 2]
         for line_obj in temp_len_2_lines:
             p0, p1 = line_obj.line[0], line_obj.line[1]
@@ -240,26 +238,27 @@ class TriangularNim(object):
         max_rate_move: Optional[Line] = None
         winning_move: Optional[Line] = None
 
-        logger.info('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
+        print('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
         for possible_line in self.legal_move:
             pyramid_temp = deepcopy(self)
+            pyramid_temp.cache_map = self.cache_map  # Ensure the cache is shared, not copied
             pyramid_temp.set_line(possible_line)
             if args.demo or args.probability:
                 print(possible_line, end='')
 
             pyramid_temp.win_count, pyramid_temp.lose_count = 0, 0
-            recursive_result, win_count, lose_count = pyramid_temp.next_move_recursive(self.player_mode_other, level=0)
+            win_in_recursive, win_count, lose_count = pyramid_temp.next_move_recursive(self.player_mode_other, level=0)
             
-            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if recursive_result else 0.0)
+            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (1.0 if win_in_recursive else 0.0)
+
+            if args.demo or args.probability:
+                print(f' 獲勝機率為 {int(rate * 100)} %')
 
             if rate > max_rate:
                 max_rate = rate
                 max_rate_move = possible_line
-            
-            if args.demo or args.probability:
-                print(f' 獲勝機率為 {int(rate * 100)} %')
 
-            if not args.demo and recursive_result:
+            if not args.demo and not args.probability and win_in_recursive:
                 winning_move = possible_line
                 break
         
@@ -290,12 +289,11 @@ class TriangularNim(object):
                 
                 return result
             except ValueError as e:
-                logger.info(e)
+                print(e)
                 continue
 
 if __name__ == '__main__':
-    logger = Logger('Nim')
-    logger.info(f'Welcome to TriangularNim version {version}')
+    print(f'Welcome to TriangularNim version {version}')
 
     parser = ArgumentParser()
     parser.add_argument('-D', '--demo', help="count best move demo", action="store_true")
@@ -314,26 +312,26 @@ if __name__ == '__main__':
             while not nim.is_finish():
                 computer_move = nim.next_move(last_line=input_line)
                 if not computer_move:
-                    logger.info('您拿走了最後的棋子，您輸了！')
+                    print('您拿走了最後的棋子，您輸了！')
                     break
                 
                 move_indices = [str(nim.all_point_list.index(p)) for p in computer_move.line]
-                logger.info(f"電腦下: {' '.join(move_indices)}")
+                print(f"電腦下: {' '.join(move_indices)}")
                 nim.show()
 
                 if nim.is_finish():
-                    logger.info('電腦拿走了最後的棋子，您獲勝了！')
+                    print('電腦拿走了最後的棋子，您獲勝了！')
                     break
                 
                 input_line = nim.get_input_line()
     except KeyboardInterrupt:
-        logger.info('\n使用者中斷')
+        print('\n使用者中斷')
     except Exception as e:
-        logger.error(f"發生未預期的錯誤: {e}", exc_info=True)
+        print(f"發生未預期的錯誤: {e}")
     finally:
-        logger.info('遊戲結束')
-        if nim.cache_map:
-            logger.info('正在儲存快取...')
+        print('遊戲結束')
+        if args.demo and nim.cache_map:
+            print('正在儲存快取...')
             with open(os.path.join(__location__, 'cache.json'), 'w') as f:
                 json.dump(nim.cache_map, f, indent=2)
-            logger.info('快取已儲存。')
+            print('快取已儲存。')
