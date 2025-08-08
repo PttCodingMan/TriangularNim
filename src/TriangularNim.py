@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from copy import deepcopy
 from typing import List, Optional, Tuple, Set
 
-version = '0.3.0'  # Bump version for the changes
+version = '0.3.1'  # Bump version for the changes
 
 # The real path to the directory containing this script
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -98,12 +98,14 @@ class TriangularNim(object):
                 self.all_point_list.append(p)
         Point.all_point_list = self.all_point_list
 
-        try:
-            with open(os.path.join(__location__, 'cache.json')) as f:
-                self.cache_map: dict = json.load(f)
-
-        except (FileNotFoundError, json.JSONDecodeError):
+        if args.demo:
             self.cache_map = {}
+        else:
+            try:
+                with open(os.path.join(__location__, 'cache.json')) as f:
+                    self.cache_map: dict = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.cache_map = {}
 
         self.win_count: int = 0
         self.lose_count: int = 0
@@ -241,12 +243,12 @@ class TriangularNim(object):
     def is_finish(self) -> bool:
         return not self.legal_move
 
-    def next_move(self, last_line: Optional[Line] = None) -> Optional[Line]:
+    def next_move(self, last_line: Optional[Line] = None) -> (Optional[Line], float):
         if last_line:
             self.set_line(last_line)
             self.show()
         if self.is_finish():
-            return None
+            return None, 0.0
 
         if not args.demo and not self.player_first and len(self.legal_move) == 63:
             best_move_list = [Line([self.all_point_list[i]]) for i in [0, 10, 14, 3, 4, 5, 7, 8, 12]]
@@ -254,13 +256,13 @@ class TriangularNim(object):
             if args.probability:
                 print(f'{line_temp} 獲勝機率為 100 %')
             self.set_line(line_temp)
-            return line_temp
+            return line_temp, 1.0
 
-        max_rate = -1.0
+        max_win_rate = -1.0
         max_rate_move: Optional[Line] = None
         winning_move: Optional[Line] = None
 
-        print('分析所有可能第一手獲勝機率' if args.demo else '開始分析...')
+        print('分析所有路徑獲勝機率' if args.demo else '開始分析...')
         # The main analysis loop now also uses backtracking
         for possible_line in self.legal_move[:]:  # Iterate over a copy
             if args.demo or args.probability:
@@ -270,28 +272,29 @@ class TriangularNim(object):
             if removed is None: continue
 
             self.win_count, self.lose_count = 0, 0
-            recursive_result, win_count, lose_count = self.next_move_recursive(self.player_mode_other, level=0)
+            win_in_recursive, win_count, lose_count = self.next_move_recursive(self.player_mode_other, level=0)
 
             self.revert_line(possible_line, removed)
 
-            rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (
-                1.0 if recursive_result else 0.0)
+            cur_win_rate = win_count / (win_count + lose_count) if (win_count + lose_count) > 0 else (
+                1.0 if win_in_recursive else 0.0)
 
-            if rate > max_rate:
-                max_rate = rate
+            if cur_win_rate > max_win_rate:
+                max_win_rate = cur_win_rate
                 max_rate_move = possible_line
 
             if args.demo or args.probability:
-                print(f' 獲勝機率為 {int(rate * 100)} %')
+                print(f' 獲勝機率為 {int(cur_win_rate * 100)} %')
 
-            if not args.demo and not args.probability and recursive_result:
+            if not args.demo and not args.probability and win_in_recursive:
                 winning_move = possible_line
+                max_win_rate = 1.0  # Found a winning move, no need to check further
                 break
 
         best_move = winning_move if winning_move else max_rate_move
         if best_move:
             self.set_line(best_move)
-        return best_move
+        return best_move, max_win_rate
 
     def get_input_line(self) -> Optional[Line]:
         while True:
@@ -338,13 +341,13 @@ if __name__ == '__main__':
             input_line = nim.get_input_line()
             # Main game loop
             while not nim.is_finish():
-                computer_move = nim.next_move(last_line=input_line)
+                computer_move, win_rate = nim.next_move(last_line=input_line)
                 if not computer_move:
                     print('您拿走了最後的棋子，您輸了！')
                     break
 
                 move_indices = [str(nim.all_point_list.index(p)) for p in computer_move.line]
-                print(f"電腦下: {' '.join(move_indices)}")
+                print(f"電腦選擇: {' '.join(move_indices)}" + (f" 獲勝機率為 {int(win_rate * 100)} %" if args.probability else ''))
                 nim.show()
 
                 if nim.is_finish():
@@ -361,5 +364,5 @@ if __name__ == '__main__':
         if args.demo and nim.cache_map:
             print('正在儲存快取...')
             with open(os.path.join(__location__, 'cache.json'), 'w') as f:
-                json.dump(nim.cache_map, f, indent=2)
+                json.dump(nim.cache_map, f, indent=2, sort_keys=True)
             print('快取已儲存。')
