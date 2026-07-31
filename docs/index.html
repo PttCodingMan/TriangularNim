@@ -128,6 +128,8 @@
   #controls button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
   #restartBtn { color: var(--gold-hi); background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.55); }
   #restartBtn:hover:not(:disabled) { background: rgba(217,119,6,.22); color: #FFF3E0; box-shadow: 0 0 14px rgba(217,119,6,.35); }
+  /* --gold-hi on --bg measures ~10.8:1; hidden via JS (renderBoard) once firstBtn is disabled */
+  #firstWarn { margin: 10px 0 0; font-size: .82rem; color: var(--gold-hi); }
 
   #message {
     margin-top: 16px; min-height: 3.2em; max-height: 14em; overflow-y: auto; padding: 12px 14px;
@@ -160,8 +162,11 @@
   #hintArea label { display: inline-block; min-height: 44px; line-height: 44px; color: var(--fg-dim); font-size: .9rem; cursor: pointer; }
   /* input / label / #hints 必須維持同層兄弟，否則此連動失效（勿把 input 包進 label） */
   #hintList:not(:checked) ~ #hints { display: none; }
+  #hintList:not(:checked) ~ #hintNote { display: none; }
+  #hintNote { margin: 6px 0 8px; font-size: .78rem; color: var(--fg-dim); line-height: 1.5; } /* --fg-dim on --bg ~8.99:1 */
   #hints {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 14px;
+    /* 260 而非 200：「對手 97% 的回應會失手」在 200px 欄寬會被折成兩行 */
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 14px;
     padding: 10px 14px; max-height: 320px; overflow: auto;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     font-family: var(--mono); font-size: .78rem;
@@ -210,6 +215,7 @@
   <!-- 語言碼固定用 ZH/EN 拉丁字母顯示，不隨語言翻譯：英文模式下頁面文字須零中文字元 -->
   <button id="langToggle" class="lang-btn" onclick="toggleLang()" data-i18n-aria="langToggleAria" aria-label="切換語言">ZH / EN</button>
   <p class="sub" id="subtitle" data-i18n-html="subtitle">三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。</p>
+  <p class="sub" id="subtitle2" data-i18n="subtitle2">先手方必勝——空盤共有 9 個必勝開局。</p>
 </header>
 
 <section class="panel">
@@ -228,18 +234,20 @@
   <button id="firstBtn" onclick="computerFirstMove()" data-i18n="computerFirst">讓電腦先下</button>
   <button id="restartBtn" onclick="restart()" data-i18n="playAgain">新局</button>
 </div>
+<p id="firstWarn" data-i18n="firstWarn">「讓電腦先下」＝電腦搶走必勝開局，這局你將無法翻盤。</p>
 <div id="message"></div>
 
 <div id="hintArea">
-  <input type="checkbox" id="hintList"><label for="hintList" data-i18n="hintLabel"> 顯示提示（各合法步的勝率）</label>
+  <input type="checkbox" id="hintList"><label for="hintList" data-i18n="hintLabel"> 顯示提示（每一步是必勝還是必輸）</label>
+  <p id="hintNote" data-i18n="hintNote">百分比是「對手有多少比例的回應會放過你」，不是你的勝率。必勝的步不需要這個數字。</p>
   <div id="hints"></div>
 </div>
 
 <details>
-  <summary data-i18n="openingSummary">開局全分析（63 種開局的勝率）</summary>
+  <summary data-i18n="openingSummary">開局全分析（63 種開局）</summary>
   <div class="tablewrap">
     <table>
-      <thead><tr><th data-i18n="thMove">棋步</th><th data-i18n="thResult">結果</th><th data-i18n="thRate">勝率</th></tr></thead>
+      <thead><tr><th data-i18n="thMove">棋步</th><th data-i18n="thResult">結果</th><th data-i18n="thRate">對手失手率</th></tr></thead>
       <tbody id="openingBody"></tbody>
     </table>
   </div>
@@ -307,7 +315,9 @@ function win(b) {
 }
 for (let b = FULL; b >= 0; b--) win(b);
 
-// 某步 mv 在盤面 board 的勝率，定義見任務說明（100% 恰好等價於必勝步）
+// 下完 mv 之後，對手所有合法回應中「仍讓我必勝」的比例。
+// 100% 恰好等價於 mv 是必勝步，所以介面上只對必輸的步顯示這個數字（稱為「對手失手率」）。
+// 注意這與 src/TriangularNim.py 的算法不同：CLI 掃到第一個反駁就停，數字會隨搜尋順序變動。
 function winRateOf(board, mv) {
   const b2 = board | mv.mask;
   const replies = MOVES.filter(r => (b2 & r.mask) === 0);
@@ -339,17 +349,23 @@ const I18N = {
   zh: {
     pageTitle: '三角形尼姆棋 Triangular Nim',
     subtitle: '三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
+    subtitle2: '先手方必勝——空盤共有 9 個必勝開局。',
     submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '新局',
-    hintLabel: ' 顯示提示（各合法步的勝率）',
-    openingSummary: '開局全分析（63 種開局的勝率）',
-    thMove: '棋步', thResult: '結果', thRate: '勝率',
+    firstWarn: '「讓電腦先下」＝電腦搶走必勝開局，這局你將無法翻盤。',
+    firstMoveWarn: '電腦搶到必勝開局，這局你已經沒有勝算。',
+    hintLabel: ' 顯示提示（每一步是必勝還是必輸）',
+    hintNote: '百分比是「對手有多少比例的回應會放過你」，不是你的勝率。必勝的步不需要這個數字。',
+    openingSummary: '開局全分析（63 種開局）',
+    thMove: '棋步', thResult: '結果', thRate: '對手失手率',
     langToggleAria: '切換語言',
-    computerPicked: '電腦選擇: {points} 獲勝機率為 {rate} %',
+    computerPickedWin: '電腦選擇: {points}',
+    computerPickedLose: '電腦選擇: {points} · 對手 {rate}% 的回應會失手',
     playerPicked: '你選擇: {points}',
     youLose: '您拿走了最後的棋子，您輸了！',
     youWin: '電腦拿走了最後的棋子，您獲勝了！',
     hintWin: '必勝', hintLose: '必輸',
-    hintLine: '{points} — {result}（勝率 {rate}%）',
+    hintLineWin: '{points}　必勝',
+    hintLineLose: '{points}　必輸 · 對手 {rate}% 的回應會失手',
     solvedCount: '已解算 {count} 個盤面',
     checkMovesCount: '合法線總數為 {count}，應為 63',
     checkOpeningSet: '長度1必勝開局為 [{actual}]，應為 [{expected}]',
@@ -361,17 +377,23 @@ const I18N = {
   en: {
     pageTitle: 'Triangular Nim',
     subtitle: 'Take the last piece and you <b>lose</b> (misère rules).',
+    subtitle2: 'The first player wins — there are 9 winning openings.',
     submit: 'Submit', clear: 'Clear', computerFirst: 'Computer First', playAgain: 'New Game',
-    hintLabel: ' Show hints (win rate per legal move)',
+    firstWarn: '"Computer First" hands the computer a winning opening — that game is unwinnable for you.',
+    firstMoveWarn: 'The computer claimed a winning opening — this game is already lost for you.',
+    hintLabel: ' Show hints (win or loss for every legal move)',
+    hintNote: "The percentage is how many of the opponent's replies fail to punish the move — not your chance of winning. Winning moves don't need it.",
     openingSummary: 'Opening analysis (all 63 first moves)',
-    thMove: 'Move', thResult: 'Result', thRate: 'Win rate',
+    thMove: 'Move', thResult: 'Result', thRate: 'Opponent slip rate',
     langToggleAria: 'Switch language',
-    computerPicked: 'Computer plays {points} — {rate}% win rate',
+    computerPickedWin: 'Computer plays {points}',
+    computerPickedLose: 'Computer plays {points} — {rate}% of replies would let it back in',
     playerPicked: 'You play {points}',
     youLose: 'You took the last piece — you lose!',
     youWin: 'The computer took the last piece — you win!',
     hintWin: 'Win', hintLose: 'Loss',
-    hintLine: '{points} — {result} (win rate {rate}%)',
+    hintLineWin: '{points}　Win',
+    hintLineLose: '{points}　Loss · {rate}% of replies would let you back in',
     solvedCount: '{count} positions solved',
     checkMovesCount: 'Total legal lines is {count}, expected 63',
     checkOpeningSet: 'Length-1 winning openings are [{actual}], expected [{expected}]',
@@ -459,6 +481,7 @@ function renderBoard() {
   document.getElementById('submitBtn').disabled = gameOver || !isLegal;
   document.getElementById('clearBtn').disabled = gameOver || selMask === 0;
   document.getElementById('firstBtn').disabled = gameOver || board !== 0;
+  document.getElementById('firstWarn').hidden = gameOver || board !== 0;
 }
 
 function showMessage(key, params) {
@@ -472,8 +495,9 @@ function renderMessages() {
   let moveNo = 0;
   const el = document.getElementById('message');
   el.innerHTML = messageLines.map(m => {
-    const isMove = m.key === 'computerPicked' || m.key === 'playerPicked';
-    const cls = m.key === 'computerPicked' ? 'ln ln-computer' : 'ln';
+    const isComputer = m.key === 'computerPickedWin' || m.key === 'computerPickedLose';
+    const isMove = isComputer || m.key === 'playerPicked';
+    const cls = isComputer ? 'ln ln-computer' : 'ln';
     return `<span class="${cls}">${isMove ? '#' + (++moveNo) + ' ' : ''}${t(m.key, m.params)}</span>`;
   }).join('');
   el.scrollTop = el.scrollHeight; // 新訊息後自動捲到底
@@ -497,7 +521,8 @@ function playerSubmit() {
   const { mv: cmv, rate } = computerMove(board);
   board |= cmv.mask;
   lastComputer = cmv.mask;
-  showMessage('computerPicked', { points: cmv.points.join(' '), rate: Math.round(rate * 100) });
+  const cWin = win(board) === false; // same "winning" definition as computeMoveStats, evaluated post-move
+  showMessage(cWin ? 'computerPickedWin' : 'computerPickedLose', { points: cmv.points.join(' '), rate: Math.round(rate * 100) });
   renderBoard();
   if (board === FULL) { showMessage('youWin'); endGame(); return; }
   renderHints();
@@ -508,7 +533,9 @@ function computerFirstMove() {
   const { mv, rate } = computerMove(0);
   board |= mv.mask;
   lastComputer = mv.mask;
-  showMessage('computerPicked', { points: mv.points.join(' '), rate: Math.round(rate * 100) });
+  const cWin = win(board) === false; // opening move is always winning, but derive it rather than assume
+  showMessage(cWin ? 'computerPickedWin' : 'computerPickedLose', { points: mv.points.join(' '), rate: Math.round(rate * 100) });
+  showMessage('firstMoveWarn');
   renderBoard();
   renderHints();
 }
@@ -522,13 +549,15 @@ function restart() {
 
 function renderHints() {
   document.getElementById('hints').innerHTML = computeMoveStats(board).map(s =>
-    `<div class="${s.winning ? 'res-win' : 'res-lose'}">${t('hintLine', { points: s.points.join(' '), result: s.winning ? t('hintWin') : t('hintLose'), rate: Math.round(s.rate * 100) })}</div>`
+    `<div class="${s.winning ? 'res-win' : 'res-lose'}">${s.winning
+      ? t('hintLineWin', { points: s.points.join(' ') })
+      : t('hintLineLose', { points: s.points.join(' '), rate: Math.round(s.rate * 100) })}</div>`
   ).join('');
 }
 
 function renderOpeningTable() {
   document.getElementById('openingBody').innerHTML = computeMoveStats(0).map(s =>
-    `<tr><td>${s.points.join(' ')}</td><td class="${s.winning ? 'res-win' : 'res-lose'}">${s.winning ? t('hintWin') : t('hintLose')}</td><td>${Math.round(s.rate * 100)}%</td></tr>`
+    `<tr><td>${s.points.join(' ')}</td><td class="${s.winning ? 'res-win' : 'res-lose'}">${s.winning ? t('hintWin') : t('hintLose')}</td><td>${s.winning ? '—' : Math.round(s.rate * 100) + '%'}</td></tr>`
   ).join('');
 }
 
