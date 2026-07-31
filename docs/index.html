@@ -130,13 +130,14 @@
   #restartBtn:hover:not(:disabled) { background: rgba(217,119,6,.22); color: #FFF3E0; box-shadow: 0 0 14px rgba(217,119,6,.35); }
 
   #message {
-    margin-top: 16px; min-height: 3.2em; padding: 12px 14px;
+    margin-top: 16px; min-height: 3.2em; max-height: 14em; overflow-y: auto; padding: 12px 14px;
     font: .84rem/1.8 var(--mono); color: var(--neon-hi);
     background: var(--surface); border: 1px solid var(--border);
     border-left: 2px solid var(--neon-mid); border-radius: 8px;
   }
   #message .ln { display: block; }
   #message .ln::before { content: "> "; color: var(--neon-mid); }
+  #message .ln.ln-computer { color: var(--gold-hi); } /* 玩家沿用預設綠色；兩色對暗底皆 >9:1 對比 */
   html[lang^="zh"] #message:empty::before { content: "> 系統就緒：請選取 1~3 顆相鄰的點。"; color: var(--fg-dim); }
   html[lang="en"] #message:empty::before { content: "> System ready — choose 1–3 adjacent points."; color: var(--fg-dim); }
 
@@ -344,6 +345,7 @@ const I18N = {
     thMove: '棋步', thResult: '結果', thRate: '勝率',
     langToggleAria: '切換語言',
     computerPicked: '電腦選擇: {points} 獲勝機率為 {rate} %',
+    playerPicked: '你選擇: {points}',
     youLose: '您拿走了最後的棋子，您輸了！',
     youWin: '電腦拿走了最後的棋子，您獲勝了！',
     hintWin: '必勝', hintLose: '必輸',
@@ -365,6 +367,7 @@ const I18N = {
     thMove: 'Move', thResult: 'Result', thRate: 'Win rate',
     langToggleAria: 'Switch language',
     computerPicked: 'Computer plays {points} — {rate}% win rate',
+    playerPicked: 'You play {points}',
     youLose: 'You took the last piece — you lose!',
     youWin: 'The computer took the last piece — you win!',
     hintWin: 'Win', hintLose: 'Loss',
@@ -465,8 +468,15 @@ function showMessage(key, params) {
 
 function renderMessages() {
   // 視覺層：每行包一個 .ln，terminal 的 "> " 前綴由 CSS ::before 產生
-  document.getElementById('message').innerHTML = messageLines
-    .map(m => `<span class="ln">${t(m.key, m.params)}</span>`).join('');
+  // 棋步訊息（玩家/電腦）依落子順序編號並上色區分；結束訊息不編號、不特別上色
+  let moveNo = 0;
+  const el = document.getElementById('message');
+  el.innerHTML = messageLines.map(m => {
+    const isMove = m.key === 'computerPicked' || m.key === 'playerPicked';
+    const cls = m.key === 'computerPicked' ? 'ln ln-computer' : 'ln';
+    return `<span class="${cls}">${isMove ? '#' + (++moveNo) + ' ' : ''}${t(m.key, m.params)}</span>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight; // 新訊息後自動捲到底
 }
 
 function endGame() {
@@ -481,6 +491,7 @@ function playerSubmit() {
   board |= mask;
   selected.clear();
   renderBoard();
+  showMessage('playerPicked', { points: mv.points.join(' ') });
   if (board === FULL) { showMessage('youLose'); endGame(); return; }
 
   const { mv: cmv, rate } = computerMove(board);
