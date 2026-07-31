@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>三角形尼姆棋 Triangular Nim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0F172A;            /* 深藍黑底 */
+    --surface: #0F1F2B;       /* 次表面 */
+    --surface-deep: #0C1826;
+    --border: rgba(255,255,255,.08);
+    --fg: #FFFFFF;
+    --fg-dim: #A9BACB;        /* 次要文字，對 --bg 對比 8.99:1 */
+    --neon: #15803D;          /* 主色 */
+    --neon-mid: #22C55E;      /* 發光 */
+    --neon-hi: #4ADE80;       /* 高亮文字 */
+    --gold: #D97706;
+    --gold-hi: #FBBF24;
+    --danger: #DC2626;
+    --danger-hi: #F87171;     /* 紅色文字用亮變體，暗底對比 6.45:1 */
+    /* 尾端補中文字型：訊息區與提示清單用 --mono 但會顯示中文，前面的等寬字都沒有中文字符，
+       不補的話中文會掉進瀏覽器預設回退（Windows 上常是 SimSun） */
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+            "PingFang TC", "Microsoft JhengHei", monospace;
+    --display: "Orbitron", var(--mono);   /* 標題專用；中文一律走 --sans，不落入此字型 */
+    --sans: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    --pt: clamp(44px, 11.5vw, 54px);   /* 點按鈕最小 44px 觸控區 */
+    --dur: .2s;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px 16px 56px;
+    background: var(--bg); color: var(--fg);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 掃描線 + 角落暈光；純裝飾，fixed + pointer-events:none 不影響互動與捲動 */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.022) 0 1px, transparent 1px 3px),
+      radial-gradient(900px 520px at 50% -12%, rgba(34,197,94,.13), transparent 70%),
+      radial-gradient(680px 460px at 105% 108%, rgba(217,119,6,.09), transparent 70%);
+  }
+  .shell { position: relative; z-index: 1; max-width: 680px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 24px; }
+  h1 {
+    margin: 0; font-family: var(--display); font-weight: 700;
+    font-size: clamp(1.3rem, 6.2vw, 2.05rem);
+    letter-spacing: .15em; text-transform: uppercase; color: var(--neon-hi);
+    text-shadow: 0 0 8px rgba(34,197,94,.55), 0 0 26px rgba(34,197,94,.26);
+    animation: hum 4.5s ease-in-out infinite;
+  }
+  @keyframes hum { 0%, 100% { opacity: 1; } 50% { opacity: .87; } }
+  .sub { margin: 10px 0 0; font-size: .92rem; color: var(--fg-dim); letter-spacing: .04em; }
+  .sub b { color: var(--gold-hi); font-weight: 600; }
+  .lang-btn {
+    display: inline-block; margin: 12px auto 0; min-width: 88px; min-height: 44px; padding: 8px 14px;
+    font-family: var(--display); font-size: .8rem; font-weight: 900; letter-spacing: .08em;
+    color: var(--neon-hi); background: rgba(21,128,61,.10);
+    border: 1px solid rgba(34,197,94,.45); border-radius: 8px; cursor: pointer;
+    transition: transform var(--dur), box-shadow var(--dur), background var(--dur), color var(--dur);
+  }
+  .lang-btn:hover { background: rgba(34,197,94,.22); color: #EAFFF1; box-shadow: 0 0 14px rgba(34,197,94,.35); transform: translateY(-1px); }
+  .lang-btn:active { transform: translateY(0); }
+
+  .panel {
+    background: linear-gradient(180deg, var(--surface), var(--surface-deep));
+    border: 1px solid var(--border); border-radius: 14px; padding: 22px 14px;
+    box-shadow: 0 0 0 1px rgba(34,197,94,.06), 0 18px 44px -24px rgba(0,0,0,.9),
+                inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  #board { display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.8vw, 10px); }
+  .row { display: flex; justify-content: center; gap: clamp(6px, 2.2vw, 12px); }
+  .pt {
+    width: var(--pt); height: var(--pt); border-radius: 50%;
+    border: 1.5px solid rgba(34,197,94,.55); color: var(--neon-hi);
+    background: radial-gradient(circle at 50% 32%, rgba(34,197,94,.20), rgba(12,24,38,.92) 72%);
+    font: 600 .78rem/1 var(--mono); letter-spacing: .04em; cursor: pointer; padding: 0;
+    box-shadow: 0 0 10px rgba(34,197,94,.24), inset 0 0 10px rgba(34,197,94,.12);
+    transition: transform var(--dur) ease, box-shadow var(--dur) ease, opacity var(--dur) ease,
+                border-color var(--dur), color var(--dur), background var(--dur);
+  }
+  .pt:hover:not(:disabled) {
+    transform: scale(1.09); border-color: var(--neon-hi);
+    box-shadow: 0 0 18px rgba(34,197,94,.5), 0 0 34px rgba(34,197,94,.22), inset 0 0 12px rgba(34,197,94,.18);
+  }
+  .pt.selected {
+    color: #04140A; border-color: var(--neon-hi); transform: scale(1.06);
+    background: linear-gradient(180deg, var(--neon-hi), var(--neon-mid));
+    box-shadow: 0 0 18px rgba(74,222,128,.6), 0 0 38px rgba(34,197,94,.3), inset 0 0 8px rgba(255,255,255,.35);
+  }
+  .pt.taken {
+    opacity: .5; color: rgba(255,255,255,.78); border-color: rgba(255,255,255,.16);
+    background: rgba(255,255,255,.04); box-shadow: none;
+  }
+  .pt.unavailable {
+    opacity: .26; color: rgba(255,255,255,.6); border-color: rgba(255,255,255,.12);
+    background: rgba(255,255,255,.02); box-shadow: none;
+  }
+  .pt.taken.lastmove { /* 電腦最後一步：紅色霓虹 */
+    opacity: 1; color: var(--danger-hi); border-color: rgba(248,113,113,.75);
+    background: radial-gradient(circle at 50% 32%, rgba(220,38,38,.38), rgba(30,10,14,.92) 72%);
+    box-shadow: 0 0 14px rgba(220,38,38,.55), 0 0 32px rgba(220,38,38,.24), inset 0 0 12px rgba(248,113,113,.2);
+  }
+  .pt:disabled { cursor: not-allowed; }
+
+  #controls { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+  #controls button {
+    flex: 1 1 auto; min-width: 118px; min-height: 44px; padding: 10px 16px;
+    font-family: var(--sans); font-size: .92rem; font-weight: 600; letter-spacing: .04em;
+    color: var(--neon-hi); background: rgba(21,128,61,.10);
+    border: 1px solid rgba(34,197,94,.45); border-radius: 8px; cursor: pointer;
+    transition: transform var(--dur), box-shadow var(--dur), background var(--dur), color var(--dur), opacity var(--dur);
+  }
+  #controls button:hover:not(:disabled) {
+    background: rgba(34,197,94,.22); color: #EAFFF1;
+    box-shadow: 0 0 14px rgba(34,197,94,.35); transform: translateY(-1px);
+  }
+  #controls button:active:not(:disabled) { transform: translateY(0); }
+  #controls button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+  #restartBtn { display: none; color: var(--gold-hi); background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.55); }
+  #restartBtn:hover:not(:disabled) { background: rgba(217,119,6,.22); color: #FFF3E0; box-shadow: 0 0 14px rgba(217,119,6,.35); }
+
+  #message {
+    margin-top: 16px; min-height: 3.2em; padding: 12px 14px;
+    font: .84rem/1.8 var(--mono); color: var(--neon-hi);
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 2px solid var(--neon-mid); border-radius: 8px;
+  }
+  #message .ln { display: block; }
+  #message .ln::before { content: "> "; color: var(--neon-mid); }
+  html[lang^="zh"] #message:empty::before { content: "> 系統就緒：請選取 1~3 顆相鄰的點。"; color: var(--fg-dim); }
+  html[lang="en"] #message:empty::before { content: "> System ready — choose 1–3 adjacent points."; color: var(--fg-dim); }
+
+  #hintArea { margin-top: 18px; }
+  /* 自繪核取方塊（appearance:none）：原生樣式在暗底會是一塊亮灰，與主題衝突 */
+  #hintList {
+    appearance: none; -webkit-appearance: none;
+    display: inline-grid; place-content: center;
+    width: 20px; height: 20px; margin: 0 8px 0 0; vertical-align: -4px;
+    background: rgba(21,128,61,.12); border: 1px solid rgba(34,197,94,.5); border-radius: 5px;
+    cursor: pointer; transition: background var(--dur), box-shadow var(--dur), border-color var(--dur);
+  }
+  #hintList::after {
+    content: ""; width: 5px; height: 10px; border: solid transparent; border-width: 0 2px 2px 0;
+    transform: translateY(-1px) rotate(45deg);
+  }
+  #hintList:hover { box-shadow: 0 0 10px rgba(34,197,94,.4); }
+  #hintList:checked { background: var(--neon-mid); border-color: var(--neon-hi); box-shadow: 0 0 12px rgba(34,197,94,.5); }
+  #hintList:checked::after { border-color: #04140A; }
+  #hintArea label { display: inline-block; min-height: 44px; line-height: 44px; color: var(--fg-dim); font-size: .9rem; cursor: pointer; }
+  /* input / label / #hints 必須維持同層兄弟，否則此連動失效（勿把 input 包進 label） */
+  #hintList:not(:checked) ~ #hints { display: none; }
+  #hints {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 14px;
+    padding: 10px 14px; max-height: 320px; overflow: auto;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    font-family: var(--mono); font-size: .78rem;
+  }
+  #hints div { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .res-win { color: var(--neon-hi); }
+  .res-lose { color: var(--danger-hi); }
+
+  details { margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  summary {
+    display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 14px;
+    color: var(--neon-hi); font-size: .9rem; font-weight: 600; cursor: pointer; list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "\25B8"; font-family: var(--mono); transition: transform var(--dur) ease; }
+  details[open] summary::before { transform: rotate(90deg); }
+  .tablewrap { overflow-x: auto; padding: 0 14px 14px; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .78rem; }
+  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; color: var(--fg-dim); }
+  th { background: rgba(255,255,255,.04); color: var(--fg); font-weight: 600; letter-spacing: .06em; }
+  tbody tr:hover td { background: rgba(34,197,94,.06); }
+
+  footer {
+    margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 4px 20px;
+    font-family: var(--mono); font-size: .78rem; color: var(--fg-dim);
+  }
+  .ok { color: var(--neon-hi); font-weight: 700; }
+  .fail { color: var(--danger-hi); font-weight: 700; }
+
+  :focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+  .pt:focus-visible { outline-offset: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
+    .pt:hover:not(:disabled), .pt.selected, #controls button:hover:not(:disabled) { transform: none; }
+    h1 { text-shadow: 0 0 6px rgba(34,197,94,.4); }
+    body::before { background: radial-gradient(900px 520px at 50% -12%, rgba(34,197,94,.10), transparent 70%); }
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+<header>
+  <h1>Triangular Nim</h1>
+  <!-- 語言碼固定用 ZH/EN 拉丁字母顯示，不隨語言翻譯：英文模式下頁面文字須零中文字元 -->
+  <button id="langToggle" class="lang-btn" onclick="toggleLang()" data-i18n-aria="langToggleAria" aria-label="切換語言">ZH / EN</button>
+  <p class="sub" id="subtitle" data-i18n-html="subtitle">三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。</p>
+</header>
+
+<section class="panel">
+<div id="board">
+  <div class="row"><button class="pt" id="pt0" onclick="togglePoint(0)">00</button></div>
+  <div class="row"><button class="pt" id="pt1" onclick="togglePoint(1)">01</button><button class="pt" id="pt2" onclick="togglePoint(2)">02</button></div>
+  <div class="row"><button class="pt" id="pt3" onclick="togglePoint(3)">03</button><button class="pt" id="pt4" onclick="togglePoint(4)">04</button><button class="pt" id="pt5" onclick="togglePoint(5)">05</button></div>
+  <div class="row"><button class="pt" id="pt6" onclick="togglePoint(6)">06</button><button class="pt" id="pt7" onclick="togglePoint(7)">07</button><button class="pt" id="pt8" onclick="togglePoint(8)">08</button><button class="pt" id="pt9" onclick="togglePoint(9)">09</button></div>
+  <div class="row"><button class="pt" id="pt10" onclick="togglePoint(10)">10</button><button class="pt" id="pt11" onclick="togglePoint(11)">11</button><button class="pt" id="pt12" onclick="togglePoint(12)">12</button><button class="pt" id="pt13" onclick="togglePoint(13)">13</button><button class="pt" id="pt14" onclick="togglePoint(14)">14</button></div>
+</div>
+</section>
+
+<div id="controls">
+  <button id="submitBtn" onclick="playerSubmit()" disabled data-i18n="submit">送出</button>
+  <button id="clearBtn" onclick="clearSelection()" disabled data-i18n="clear">清除選取</button>
+  <button id="firstBtn" onclick="computerFirstMove()" data-i18n="computerFirst">讓電腦先下</button>
+  <button id="restartBtn" onclick="restart()" data-i18n="playAgain">重新開始</button>
+</div>
+<div id="message"></div>
+
+<div id="hintArea">
+  <input type="checkbox" id="hintList"><label for="hintList" data-i18n="hintLabel"> 顯示提示（各合法步的勝率）</label>
+  <div id="hints"></div>
+</div>
+
+<details>
+  <summary data-i18n="openingSummary">開局全分析（63 種開局的勝率）</summary>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th data-i18n="thMove">棋步</th><th data-i18n="thResult">結果</th><th data-i18n="thRate">勝率</th></tr></thead>
+      <tbody id="openingBody"></tbody>
+    </table>
+  </div>
+</details>
+
+<footer>
+  <div id="solvedCount"></div>
+  <div id="selfcheck"></div>
+</footer>
+</main>
+
+<script>
+'use strict';
+// 15 格 row-major 編號：row y 有 x=0..y 共 y+1 格，index = y*(y+1)/2 + x
+function idx(y, x) { return y * (y + 1) / 2 + x; }
+function validPt(y, x) { return y >= 0 && y < 5 && x >= 0 && x <= y; }
+
+// 產生 63 條合法線：長度1(15) + 長度2(向右/左下/右下延伸) + 長度3(同方向再延伸一格)
+function generateMoves() {
+  const maskMap = new Map();
+  function addLine(points) {
+    let mask = 0;
+    for (const p of points) mask |= (1 << p);
+    if (!maskMap.has(mask)) maskMap.set(mask, points.slice().sort((a, b) => a - b));
+  }
+  for (let i = 0; i < 15; i++) addLine([i]);
+
+  const len2 = [];
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x <= y; x++) {
+      if (validPt(y, x + 1)) { addLine([idx(y, x), idx(y, x + 1)]); len2.push([[y, x], [y, x + 1]]); }
+      if (validPt(y + 1, x)) { addLine([idx(y, x), idx(y + 1, x)]); len2.push([[y, x], [y + 1, x]]); }
+      if (validPt(y + 1, x + 1)) { addLine([idx(y, x), idx(y + 1, x + 1)]); len2.push([[y, x], [y + 1, x + 1]]); }
+    }
+  }
+  for (const [p0, p1] of len2) {
+    const [y0, x0] = p0, [y1, x1] = p1;
+    let y2, x2;
+    if (y0 === y1 && x0 + 1 === x1) { y2 = y1; x2 = x1 + 1; }
+    else if (y0 + 1 === y1 && x0 === x1) { y2 = y1 + 1; x2 = x1; }
+    else { y2 = y1 + 1; x2 = x1 + 1; }
+    if (validPt(y2, x2)) addLine([idx(y0, x0), idx(y1, x1), idx(y2, x2)]);
+  }
+  return Array.from(maskMap.entries()).map(([mask, points]) => ({ mask, points }));
+}
+
+const MOVES = generateMoves();
+const FULL = (1 << 15) - 1;
+
+// 全解：memo[b] = 0 未算 / 1 輪到我會輸 / 2 輪到我會贏
+const memo = new Int8Array(32768);
+function win(b) {
+  if (memo[b]) return memo[b] === 2;
+  let hasLegal = false;
+  let result = false;
+  for (const mv of MOVES) {
+    if ((b & mv.mask) === 0) {
+      hasLegal = true;
+      if (!win(b | mv.mask)) { result = true; break; }
+    }
+  }
+  if (!hasLegal) result = true; // 無合法步 = 對手剛拿走最後一顆，對手輸，我贏
+  memo[b] = result ? 2 : 1;
+  return result;
+}
+for (let b = FULL; b >= 0; b--) win(b);
+
+// 某步 mv 在盤面 board 的勝率，定義見任務說明（100% 恰好等價於必勝步）
+function winRateOf(board, mv) {
+  const b2 = board | mv.mask;
+  const replies = MOVES.filter(r => (b2 & r.mask) === 0);
+  if (replies.length === 0) return win(b2) ? 0 : 1;
+  let good = 0;
+  for (const r of replies) if (win(b2 | r.mask) === true) good++;
+  return good / replies.length;
+}
+
+function computeMoveStats(board) {
+  const stats = MOVES.filter(mv => (board & mv.mask) === 0).map(mv => ({
+    points: mv.points, rate: winRateOf(board, mv), winning: win(board | mv.mask) === false
+  }));
+  stats.sort((a, b) => b.rate - a.rate);
+  return stats;
+}
+
+function computerMove(board) {
+  const legal = MOVES.filter(mv => (board & mv.mask) === 0);
+  const winners = legal.filter(mv => win(board | mv.mask) === false);
+  const mv = winners.length > 0
+    ? winners[Math.floor(Math.random() * winners.length)]
+    : legal.reduce((best, m) => winRateOf(board, m) > winRateOf(board, best) ? m : best, legal[0]);
+  return { mv, rate: winRateOf(board, mv) };
+}
+
+// ---- 中英雙語 ----
+const I18N = {
+  zh: {
+    pageTitle: '三角形尼姆棋 Triangular Nim',
+    subtitle: '三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
+    submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '重新開始',
+    hintLabel: ' 顯示提示（各合法步的勝率）',
+    openingSummary: '開局全分析（63 種開局的勝率）',
+    thMove: '棋步', thResult: '結果', thRate: '勝率',
+    langToggleAria: '切換語言',
+    computerPicked: '電腦選擇: {points} 獲勝機率為 {rate} %',
+    youLose: '您拿走了最後的棋子，您輸了！',
+    youWin: '電腦拿走了最後的棋子，您獲勝了！',
+    hintWin: '必勝', hintLose: '必輸',
+    hintLine: '{points} — {result}（勝率 {rate}%）',
+    solvedCount: '已解算 {count} 個盤面',
+    checkMovesCount: '合法線總數為 {count}，應為 63',
+    checkOpeningSet: '長度1必勝開局為 [{actual}]，應為 [{expected}]',
+    checkRateMismatch: '勝率100%與必勝步不等價於棋步 [{points}]',
+    selfCheckPass: '自我檢查：通過（必勝開局點集合：{points}）',
+    selfCheckFail: '自我檢查：失敗 — {reasons}',
+    listSep: '；',
+  },
+  en: {
+    pageTitle: 'Triangular Nim',
+    subtitle: 'Take the last piece and you <b>lose</b> (misère rules).',
+    submit: 'Submit', clear: 'Clear', computerFirst: 'Computer First', playAgain: 'Play Again',
+    hintLabel: ' Show hints (win rate per legal move)',
+    openingSummary: 'Opening analysis (all 63 first moves)',
+    thMove: 'Move', thResult: 'Result', thRate: 'Win rate',
+    langToggleAria: 'Switch language',
+    computerPicked: 'Computer plays {points} — {rate}% win rate',
+    youLose: 'You took the last piece — you lose!',
+    youWin: 'The computer took the last piece — you win!',
+    hintWin: 'Win', hintLose: 'Loss',
+    hintLine: '{points} — {result} (win rate {rate}%)',
+    solvedCount: '{count} positions solved',
+    checkMovesCount: 'Total legal lines is {count}, expected 63',
+    checkOpeningSet: 'Length-1 winning openings are [{actual}], expected [{expected}]',
+    checkRateMismatch: '100% win rate does not match a winning move for [{points}]',
+    selfCheckPass: 'Self-check passed (winning openings: {points})',
+    selfCheckFail: 'Self-check failed — {reasons}',
+    listSep: '; ',
+  },
+};
+
+function detectInitialLang() {
+  const saved = localStorage.getItem('lang');
+  if (saved === 'zh' || saved === 'en') return saved;
+  return (navigator.language || '').startsWith('zh') ? 'zh' : 'en';
+}
+let currentLang = detectInitialLang();
+
+// key 查表 + {token} 參數替換；key 找不到就原樣印出 key，方便發現漏翻
+function t(key, params) {
+  let str = (I18N[currentLang] && I18N[currentLang][key]) ?? key;
+  if (params) for (const k in params) str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
+  return str;
+}
+
+function setLang(lang) {
+  if (lang !== 'zh' && lang !== 'en') return;
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  applyLang();
+}
+function toggleLang() { setLang(currentLang === 'zh' ? 'en' : 'zh'); }
+
+function applyLang() {
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-Hant' : 'en';
+  document.title = t('pageTitle');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+  renderMessages();
+  renderHints();
+  renderOpeningTable();
+  renderSolvedCount();
+  selfCheck();
+}
+
+// ---- 遊戲狀態與畫面 ----
+let board = 0;
+let selected = new Set();
+let gameOver = false;
+let messageLines = [];  // 結構化紀錄 {key, params}，切語言時 renderMessages() 依當前語言整批重繪
+let lastComputer = 0;  // 電腦最後一步的 mask，只為了在盤面上標色
+let solvedCountValue = 0;
+
+function selectedMask() { let m = 0; for (const i of selected) m |= (1 << i); return m; }
+
+function togglePoint(i) {
+  if (gameOver || (board & (1 << i))) return;
+  if (selected.has(i)) { selected.delete(i); renderBoard(); return; }
+  const selMask = selectedMask();
+  const can = MOVES.some(mv => (board & mv.mask) === 0 && ((selMask | (1 << i)) & mv.mask) === (selMask | (1 << i)));
+  if (!can) return;
+  selected.add(i);
+  renderBoard();
+}
+
+function clearSelection() { selected.clear(); renderBoard(); }
+
+function renderBoard() {
+  const selMask = selectedMask();
+  for (let i = 0; i < 15; i++) {
+    const btn = document.getElementById('pt' + i);
+    const taken = (board & (1 << i)) !== 0;
+    btn.classList.toggle('taken', taken);
+    btn.classList.toggle('selected', selected.has(i));
+    btn.classList.toggle('lastmove', (lastComputer & (1 << i)) !== 0);
+    let unavailable = false;
+    if (!taken && !selected.has(i)) {
+      const can = MOVES.some(mv => (board & mv.mask) === 0 && ((selMask | (1 << i)) & mv.mask) === (selMask | (1 << i)));
+      unavailable = !can;
+    }
+    btn.classList.toggle('unavailable', unavailable);
+    btn.disabled = gameOver || taken || unavailable;
+  }
+  const isLegal = selMask !== 0 && MOVES.some(mv => mv.mask === selMask && (board & mv.mask) === 0);
+  document.getElementById('submitBtn').disabled = gameOver || !isLegal;
+  document.getElementById('clearBtn').disabled = gameOver || selMask === 0;
+  document.getElementById('firstBtn').disabled = gameOver || board !== 0;
+}
+
+function showMessage(key, params) {
+  messageLines.push({ key, params });
+  renderMessages();
+}
+
+function renderMessages() {
+  // 視覺層：每行包一個 .ln，terminal 的 "> " 前綴由 CSS ::before 產生
+  document.getElementById('message').innerHTML = messageLines
+    .map(m => `<span class="ln">${t(m.key, m.params)}</span>`).join('');
+}
+
+function endGame() {
+  gameOver = true;
+  document.getElementById('restartBtn').style.display = 'inline-block';
+  renderBoard();
+}
+
+function playerSubmit() {
+  const mask = selectedMask();
+  const mv = MOVES.find(m => m.mask === mask && (board & m.mask) === 0);
+  if (!mv) return;
+  board |= mask;
+  selected.clear();
+  renderBoard();
+  if (board === FULL) { showMessage('youLose'); endGame(); return; }
+
+  const { mv: cmv, rate } = computerMove(board);
+  board |= cmv.mask;
+  lastComputer = cmv.mask;
+  showMessage('computerPicked', { points: cmv.points.join(' '), rate: Math.round(rate * 100) });
+  renderBoard();
+  if (board === FULL) { showMessage('youWin'); endGame(); return; }
+  renderHints();
+}
+
+function computerFirstMove() {
+  if (board !== 0 || gameOver) return;
+  const { mv, rate } = computerMove(0);
+  board |= mv.mask;
+  lastComputer = mv.mask;
+  showMessage('computerPicked', { points: mv.points.join(' '), rate: Math.round(rate * 100) });
+  renderBoard();
+  renderHints();
+}
+
+function restart() {
+  board = 0; selected.clear(); gameOver = false; messageLines = []; lastComputer = 0;
+  renderMessages();
+  document.getElementById('restartBtn').style.display = 'none';
+  renderBoard();
+  renderHints();
+}
+
+function renderHints() {
+  document.getElementById('hints').innerHTML = computeMoveStats(board).map(s =>
+    `<div class="${s.winning ? 'res-win' : 'res-lose'}">${t('hintLine', { points: s.points.join(' '), result: s.winning ? t('hintWin') : t('hintLose'), rate: Math.round(s.rate * 100) })}</div>`
+  ).join('');
+}
+
+function renderOpeningTable() {
+  document.getElementById('openingBody').innerHTML = computeMoveStats(0).map(s =>
+    `<tr><td>${s.points.join(' ')}</td><td class="${s.winning ? 'res-win' : 'res-lose'}">${s.winning ? t('hintWin') : t('hintLose')}</td><td>${Math.round(s.rate * 100)}%</td></tr>`
+  ).join('');
+}
+
+function renderSolvedCount() {
+  document.getElementById('solvedCount').textContent = t('solvedCount', { count: solvedCountValue });
+}
+
+function selfCheck() {
+  let ok = true;
+  const reasons = [];
+
+  if (MOVES.length !== 63) { ok = false; reasons.push(t('checkMovesCount', { count: MOVES.length })); }
+
+  const openingWinning1 = MOVES.filter(mv => mv.points.length === 1 && win(mv.mask) === false)
+    .map(mv => mv.points[0]).sort((a, b) => a - b);
+  const expected = [0, 3, 4, 5, 7, 8, 10, 12, 14];
+  const matches = openingWinning1.length === expected.length && openingWinning1.every((v, i) => v === expected[i]);
+  if (!matches) reasons.push(t('checkOpeningSet', { actual: openingWinning1.join(','), expected: expected.join(',') })), ok = false;
+
+  let mismatch = null;
+  for (const mv of MOVES) {
+    const rate = winRateOf(0, mv);
+    const winning = win(mv.mask) === false;
+    if ((rate === 1) !== winning) { mismatch = mv; break; }
+  }
+  if (mismatch) { ok = false; reasons.push(t('checkRateMismatch', { points: mismatch.points.join(' ') })); }
+
+  console.log('自我檢查細節', { movesCount: MOVES.length, openingWinning1, expected, mismatch });
+
+  const el = document.getElementById('selfcheck');
+  if (ok) {
+    el.textContent = t('selfCheckPass', { points: openingWinning1.join(', ') });
+    el.className = 'ok';
+  } else {
+    el.textContent = t('selfCheckFail', { reasons: reasons.join(t('listSep')) });
+    el.className = 'fail';
+  }
+}
+
+// ---- 初始化 ----
+renderBoard();
+for (let i = 0; i < 32768; i++) if (memo[i] !== 0) solvedCountValue++;
+applyLang();
+</script>
+</body>
+</html>
