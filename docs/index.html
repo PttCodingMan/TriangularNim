@@ -126,7 +126,7 @@
   }
   #controls button:active:not(:disabled) { transform: translateY(0); }
   #controls button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
-  #restartBtn { display: none; color: var(--gold-hi); background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.55); }
+  #restartBtn { color: var(--gold-hi); background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.55); }
   #restartBtn:hover:not(:disabled) { background: rgba(217,119,6,.22); color: #FFF3E0; box-shadow: 0 0 14px rgba(217,119,6,.35); }
 
   #message {
@@ -225,7 +225,7 @@
   <button id="submitBtn" onclick="playerSubmit()" disabled data-i18n="submit">送出</button>
   <button id="clearBtn" onclick="clearSelection()" disabled data-i18n="clear">清除選取</button>
   <button id="firstBtn" onclick="computerFirstMove()" data-i18n="computerFirst">讓電腦先下</button>
-  <button id="restartBtn" onclick="restart()" data-i18n="playAgain">重新開始</button>
+  <button id="restartBtn" onclick="restart()" data-i18n="playAgain">新局</button>
 </div>
 <div id="message"></div>
 
@@ -338,7 +338,7 @@ const I18N = {
   zh: {
     pageTitle: '三角形尼姆棋 Triangular Nim',
     subtitle: '三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
-    submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '重新開始',
+    submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '新局',
     hintLabel: ' 顯示提示（各合法步的勝率）',
     openingSummary: '開局全分析（63 種開局的勝率）',
     thMove: '棋步', thResult: '結果', thRate: '勝率',
@@ -359,7 +359,7 @@ const I18N = {
   en: {
     pageTitle: 'Triangular Nim',
     subtitle: 'Take the last piece and you <b>lose</b> (misère rules).',
-    submit: 'Submit', clear: 'Clear', computerFirst: 'Computer First', playAgain: 'Play Again',
+    submit: 'Submit', clear: 'Clear', computerFirst: 'Computer First', playAgain: 'New Game',
     hintLabel: ' Show hints (win rate per legal move)',
     openingSummary: 'Opening analysis (all 63 first moves)',
     thMove: 'Move', thResult: 'Result', thRate: 'Win rate',
@@ -471,7 +471,6 @@ function renderMessages() {
 
 function endGame() {
   gameOver = true;
-  document.getElementById('restartBtn').style.display = 'inline-block';
   renderBoard();
 }
 
@@ -506,7 +505,6 @@ function computerFirstMove() {
 function restart() {
   board = 0; selected.clear(); gameOver = false; messageLines = []; lastComputer = 0;
   renderMessages();
-  document.getElementById('restartBtn').style.display = 'none';
   renderBoard();
   renderHints();
 }
