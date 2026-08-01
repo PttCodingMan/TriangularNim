@@ -199,6 +199,11 @@
     display: flex; flex-wrap: wrap; gap: 4px 20px;
     font-family: var(--mono); font-size: .78rem; color: var(--fg-dim);
   }
+  footer a {
+    color: var(--neon-hi); text-decoration: none; padding: 6px 0;
+    border-bottom: 1px solid rgba(34,197,94,.4); transition: border-color var(--dur), text-shadow var(--dur);
+  }
+  footer a:hover { border-bottom-color: var(--neon-hi); text-shadow: 0 0 8px rgba(34,197,94,.6); }
   .ok { color: var(--neon-hi); font-weight: 700; }
   .fail { color: var(--danger-hi); font-weight: 700; }
 
@@ -261,6 +266,9 @@
 <footer>
   <div id="solvedCount"></div>
   <div id="selfcheck"></div>
+  <!-- 連結文字用 GitHub 這種拉丁字，只有「文章」需要翻譯，維持英文模式零中文字元 -->
+  <a href="https://github.com/PttCodingMan/TriangularNim" target="_blank" rel="noopener">GitHub</a>
+  <a href="https://codingman.cc/d9b2/" target="_blank" rel="noopener" data-i18n="articleLink">文章</a>
 </footer>
 </main>
 
@@ -372,6 +380,7 @@ const I18N = {
     hintLineWin: '{points}　必勝路徑',
     hintLineLose: '{points}　有必輸路徑，但對手有 {rate}% 機率會失手',
     solvedCount: '已解算 {count} 個盤面',
+    articleLink: '文章',
     checkMovesCount: '合法線總數為 {count}，應為 63',
     checkOpeningSet: '長度1必勝開局為 [{actual}]，應為 [{expected}]',
     checkRateMismatch: '勝率100%與必勝步不等價於棋步 [{points}]',
@@ -400,6 +409,7 @@ const I18N = {
     hintLineWin: '{points}　Winning line',
     hintLineLose: '{points}　Losing line, but the opponent has a {rate}% chance of slipping',
     solvedCount: '{count} positions solved',
+    articleLink: 'Write-up',
     checkMovesCount: 'Total legal lines is {count}, expected 63',
     checkOpeningSet: 'Length-1 winning openings are [{actual}], expected [{expected}]',
     checkRateMismatch: '100% win rate does not match a winning move for [{points}]',
