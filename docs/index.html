@@ -170,8 +170,8 @@
   #hintList:not(:checked) ~ #hintNote { display: none; }
   #hintNote { margin: 6px 0 8px; font-size: .78rem; color: var(--fg-dim); line-height: 1.5; } /* --fg-dim on --bg ~8.99:1 */
   #hints {
-    /* 260 而非 200：「對手 97% 的回應會失手」在 200px 欄寬會被折成兩行 */
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 14px;
+    /* 310 而非 260：提示句改長成「有必輸路徑，但對手有 97% 機率會失手」後，260px 欄寬會折成兩行 */
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 0 14px;
     padding: 10px 14px; max-height: 320px; overflow: auto;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
     font-family: var(--mono); font-size: .78rem;
@@ -369,8 +369,8 @@ const I18N = {
     youLose: '您拿走了最後的棋子，您輸了！',
     youWin: '電腦拿走了最後的棋子，您獲勝了！',
     hintWin: '必勝', hintLose: '必輸',
-    hintLineWin: '{points}　必勝',
-    hintLineLose: '{points}　必輸 · 對手 {rate}% 的回應會失手',
+    hintLineWin: '{points}　必勝路徑',
+    hintLineLose: '{points}　有必輸路徑，但對手有 {rate}% 機率會失手',
     solvedCount: '已解算 {count} 個盤面',
     checkMovesCount: '合法線總數為 {count}，應為 63',
     checkOpeningSet: '長度1必勝開局為 [{actual}]，應為 [{expected}]',
@@ -397,8 +397,8 @@ const I18N = {
     youLose: 'You took the last piece — you lose!',
     youWin: 'The computer took the last piece — you win!',
     hintWin: 'Win', hintLose: 'Loss',
-    hintLineWin: '{points}　Win',
-    hintLineLose: '{points}　Loss · {rate}% of replies would let you back in',
+    hintLineWin: '{points}　Winning line',
+    hintLineLose: '{points}　Losing line, but the opponent has a {rate}% chance of slipping',
     solvedCount: '{count} positions solved',
     checkMovesCount: 'Total legal lines is {count}, expected 63',
     checkOpeningSet: 'Length-1 winning openings are [{actual}], expected [{expected}]',
