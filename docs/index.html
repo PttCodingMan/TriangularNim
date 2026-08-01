@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>三角形尼姆棋 Triangular Nim</title>
+<title>三角棋 Triangular Nim</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -214,7 +214,7 @@
   <h1>Triangular Nim</h1>
   <!-- 語言碼固定用 ZH/EN 拉丁字母顯示，不隨語言翻譯：英文模式下頁面文字須零中文字元 -->
   <button id="langToggle" class="lang-btn" onclick="toggleLang()" data-i18n-aria="langToggleAria" aria-label="切換語言">ZH / EN</button>
-  <p class="sub" id="subtitle" data-i18n-html="subtitle">三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。</p>
+  <p class="sub" id="subtitle" data-i18n-html="subtitle">三角棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。</p>
   <p class="sub" id="subtitle2" data-i18n="subtitle2">先手方必勝——空盤共有 9 個必勝開局。</p>
 </header>
 
@@ -347,8 +347,8 @@ function computerMove(board) {
 // ---- 中英雙語 ----
 const I18N = {
   zh: {
-    pageTitle: '三角形尼姆棋 Triangular Nim',
-    subtitle: '三角形尼姆棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
+    pageTitle: '三角棋 Triangular Nim',
+    subtitle: '三角棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
     subtitle2: '先手方必勝——空盤共有 9 個必勝開局。',
     submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '新局',
     firstWarn: '「讓電腦先下」＝電腦搶走必勝開局，這局你將無法翻盤。',
