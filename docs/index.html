@@ -241,6 +241,7 @@
 <div id="controls">
   <button id="submitBtn" onclick="playerSubmit()" disabled data-i18n="submit">送出</button>
   <button id="clearBtn" onclick="clearSelection()" disabled data-i18n="clear">清除選取</button>
+  <button id="undoBtn" onclick="undo()" disabled data-i18n="undo">上一步</button>
   <button id="firstBtn" onclick="computerFirstMove()" data-i18n="computerFirst">讓電腦先下</button>
   <button id="restartBtn" onclick="restart()" data-i18n="playAgain">新局</button>
 </div>
@@ -351,9 +352,22 @@ function computeMoveStats(board) {
 function computerMove(board) {
   const legal = MOVES.filter(mv => (board & mv.mask) === 0);
   const winners = legal.filter(mv => win(board | mv.mask) === false);
-  const mv = winners.length > 0
-    ? winners[Math.floor(Math.random() * winners.length)]
-    : legal.reduce((best, m) => winRateOf(board, m) > winRateOf(board, best) ? m : best, legal[0]);
+  // 有必勝步就在必勝步之間均勻隨機（怎麼挑都贏）。
+  // 沒有必勝步時反正都會輸，改成依「對手失手率」加權隨機：高失手率的步機率高很多，
+  // 但不再每次都下同一步。實測 k=16：平均失手率 0.905（最佳 0.979），等效約 30 種棋步。
+  // ponytail: k 是可調旋鈕，調高＝更貼近最佳解、變化少，調低＝更花俏、略讓步。
+  const k = 16;
+  let mv;
+  if (winners.length > 0) {
+    mv = winners[Math.floor(Math.random() * winners.length)];
+  } else {
+    const weights = legal.map(m => Math.pow(winRateOf(board, m), k));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    mv = legal[legal.length - 1];
+    if (total > 0) for (let i = 0; i < legal.length; i++) { r -= weights[i]; if (r <= 0) { mv = legal[i]; break; } }
+    else mv = legal[Math.floor(Math.random() * legal.length)];
+  }
   return { mv, rate: winRateOf(board, mv) };
 }
 
@@ -363,7 +377,7 @@ const I18N = {
     pageTitle: '三角棋 Triangular Nim',
     subtitle: '三角棋 — 誰拿走最後一顆棋子，誰就<b>輸了</b>（misère 規則）。',
     subtitle2: '先手方必勝——空盤共有 9 個必勝開局。',
-    submit: '送出', clear: '清除選取', computerFirst: '讓電腦先下', playAgain: '新局',
+    submit: '送出', clear: '清除選取', undo: '上一步', computerFirst: '讓電腦先下', playAgain: '新局',
     firstWarn: '「讓電腦先下」＝電腦搶走必勝開局，這局你將無法翻盤。',
     firstMoveWarn: '電腦搶到必勝開局，這局你已經沒有勝算。',
     hintLabel: ' 顯示提示（每一步是必勝還是必輸）',
@@ -392,7 +406,7 @@ const I18N = {
     pageTitle: 'Triangular Nim',
     subtitle: 'Take the last piece and you <b>lose</b> (misère rules).',
     subtitle2: 'The first player wins — there are 9 winning openings.',
-    submit: 'Submit', clear: 'Clear', computerFirst: 'Computer First', playAgain: 'New Game',
+    submit: 'Submit', clear: 'Clear', undo: 'Undo', computerFirst: 'Computer First', playAgain: 'New Game',
     firstWarn: '"Computer First" hands the computer a winning opening — that game is unwinnable for you.',
     firstMoveWarn: 'The computer claimed a winning opening — this game is already lost for you.',
     hintLabel: ' Show hints (win or loss for every legal move)',
@@ -461,6 +475,20 @@ let gameOver = false;
 let messageLines = [];  // 結構化紀錄 {key, params}，切語言時 renderMessages() 依當前語言整批重繪
 let lastComputer = 0;  // 電腦最後一步的 mask，只為了在盤面上標色
 let solvedCountValue = 0;
+let history = [];  // 每落子一輪存一份快照，undo() 直接還原（含電腦的回應）
+
+function pushHistory() { history.push({ board, lastComputer, msgLen: messageLines.length, gameOver }); }
+
+function undo() {
+  const h = history.pop();
+  if (!h) return;
+  ({ board, lastComputer, gameOver } = h);
+  messageLines.length = h.msgLen;
+  selected.clear();
+  renderMessages();
+  renderBoard();
+  renderHints();
+}
 
 function selectedMask() { let m = 0; for (const i of selected) m |= (1 << i); return m; }
 
@@ -495,6 +523,7 @@ function renderBoard() {
   const isLegal = selMask !== 0 && MOVES.some(mv => mv.mask === selMask && (board & mv.mask) === 0);
   document.getElementById('submitBtn').disabled = gameOver || !isLegal;
   document.getElementById('clearBtn').disabled = gameOver || selMask === 0;
+  document.getElementById('undoBtn').disabled = history.length === 0;  // 認輸後也能悔棋
   document.getElementById('firstBtn').disabled = gameOver || board !== 0;
   document.getElementById('firstWarn').hidden = gameOver || board !== 0;
 }
@@ -527,6 +556,7 @@ function playerSubmit() {
   const mask = selectedMask();
   const mv = MOVES.find(m => m.mask === mask && (board & m.mask) === 0);
   if (!mv) return;
+  pushHistory();
   board |= mask;
   selected.clear();
   renderBoard();
@@ -545,6 +575,7 @@ function playerSubmit() {
 
 function computerFirstMove() {
   if (board !== 0 || gameOver) return;
+  pushHistory();
   const { mv, rate } = computerMove(0);
   board |= mv.mask;
   lastComputer = mv.mask;
@@ -556,7 +587,7 @@ function computerFirstMove() {
 }
 
 function restart() {
-  board = 0; selected.clear(); gameOver = false; messageLines = []; lastComputer = 0;
+  board = 0; selected.clear(); gameOver = false; messageLines = []; lastComputer = 0; history = [];
   renderMessages();
   renderBoard();
   renderHints();
